@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QTableView, QHeaderView, QMenuBar, 
                              QLabel, QPushButton, QStatusBar, QLineEdit, QMessageBox,
                              QInputDialog, QMenu)
-from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent, QSortFilterProxyModel
+from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent, QSortFilterProxyModel, QFileSystemWatcher, QTimer
 from PySide6.QtGui import QAction, QIcon, QPixmap
 import qtawesome as qta
 import ctypes
@@ -41,6 +41,14 @@ class FilePanel(QWidget):
         last_path = self.settings.value(f"panels/{self.panel_id}/path")
         if last_path and os.path.exists(last_path):
             self.current_path = last_path
+
+        # File system watcher for auto-refresh
+        self._watcher = QFileSystemWatcher(self)
+        self._watcher.directoryChanged.connect(self._on_dir_changed)
+        self._debounce = QTimer(self)
+        self._debounce.setSingleShot(True)
+        self._debounce.setInterval(300)  # 300ms debounce
+        self._debounce.timeout.connect(self._do_auto_refresh)
 
         self.setup_ui()
         self.refresh_path(self.current_path)
@@ -238,16 +246,48 @@ class FilePanel(QWidget):
         self.path_label.setText(self.current_path)
         self.settings.setValue(f"panels/{self.panel_id}/path", self.current_path)
         
+        # Update watcher to new directory
+        watched = self._watcher.directories()
+        if watched:
+            self._watcher.removePaths(watched)
+        if os.path.isdir(self.current_path):
+            self._watcher.addPath(self.current_path)
+        
         self.thread = ScanThread(self.current_path)
         self.thread.worker.finished.connect(self.on_scan_finished)
         self.thread.start()
 
     def on_scan_finished(self, files):
+        # Preserve current selection if this is an auto-refresh
+        selected_name = None
+        idx = self.table.currentIndex()
+        if idx.isValid():
+            fi = self.model.get_file(idx.row())
+            if fi:
+                selected_name = fi.name
+        
         self.model.update_files(files)
-        # Refresh header to redraw sort arrows
         self.table.horizontalHeader().viewport().update()
+        
+        # Restore selection by name
+        if selected_name:
+            for row in range(self.model.rowCount()):
+                fi = self.model.get_file(row)
+                if fi and fi.name == selected_name:
+                    self.table.selectRow(row)
+                    return
         self.table.selectRow(0)
-        self.table.setFocus()
+
+    def _on_dir_changed(self, path):
+        """Called by QFileSystemWatcher when directory contents change."""
+        self._debounce.start()  # restart 300ms timer
+
+    def _do_auto_refresh(self):
+        """Debounced auto-refresh – re-scan current directory."""
+        if os.path.isdir(self.current_path):
+            self.thread = ScanThread(self.current_path)
+            self.thread.worker.finished.connect(self.on_scan_finished)
+            self.thread.start()
 
     def _on_header_clicked(self, col: int):
         """Toggle asc/desc on same column, switch to asc on new column."""

@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QFont
 import qtawesome as qta
+from syntax_highlighter import CodeHighlighter
 
 class PreviewDialog(QDialog):
     def __init__(self, file_path, parent=None):
@@ -72,6 +73,9 @@ class PreviewDialog(QDialog):
             with open(self.file_path, "r", encoding="utf-8", errors="replace") as f:
                 content = f.read(1024 * 512)  # Max 512KB preview
             editor.setPlainText(content)
+            # Apply syntax highlighting
+            ext = os.path.splitext(self.file_path)[1]
+            self._highlighter = CodeHighlighter(editor.document(), ext)
         except Exception as e:
             editor.setPlainText(f"Error reading file: {e}")
         layout.addWidget(editor)
