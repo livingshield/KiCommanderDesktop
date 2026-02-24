@@ -1,0 +1,23 @@
+# KiCommander Desktop Task List
+
+- [x] Phase 1: Planning and Setup
+  - [x] Analyze requirements and screenshot
+  - [x] Refine implementation plan with architectural feedback
+  - [/] Initialize project and environment (PySide6, dependencies)
+- [x] Phase 2: Core Architecture & Async Reading
+  - [x] Implement `QAbstractTableModel` for file system representation
+  - [x] Implement asynchronous directory scanning using `QThread`/`QRunnable`
+  - [x] Create Main Window with dual `QTableView` layout
+  - [x] Omit/Handle OS permission errors during scanning
+- [ ] Phase 3: Navigation & State Persistence
+  - [ ] Implement navigation logic (double-click, Enter, `..`)
+  - [ ] Integrate `QSettings` to remember last paths and window state
+  - [ ] Implement menu bar and bottom informational bars
+- [ ] Phase 4: Interactive Operations (F3-F8)
+  - [ ] Implement multi-selection logic (spacebar etc.)
+  - [ ] Implement F3 (View), F5/F6 (Copy/Move), F7 (New Folder), F8 (Delete)
+  - [ ] Add basic shell command support
+- [ ] Phase 5: Modern UI & Live Updates
+  - [ ] Apply modern QSS theme and icons
+  - [ ] Integrate `QFileSystemWatcher` for real-time updates
+  - [ ] Final polishing and verification

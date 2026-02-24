@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+ENV/
+
+# Secrets
+secrets.json
+.env
+
+# Workspace
+.vscode/
+.idea/
+.gemini/
