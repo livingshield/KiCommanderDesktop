@@ -12,6 +12,7 @@ class PreviewDialog(QDialog):
         self.setWindowTitle(f"Preview - {os.path.basename(file_path)}")
         self.setMinimumSize(700, 500)
         self.setup_ui()
+        self.setWindowIcon(qta.icon("fa5s.eye", color="#89b4fa"))
 
     def setup_ui(self):
         self.setStyleSheet("""

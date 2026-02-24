@@ -12,6 +12,7 @@ class PropertiesDialog(QDialog):
         self.setWindowTitle(f"Properties - {os.path.basename(file_path)}")
         self.setMinimumWidth(400)
         self.setup_ui()
+        self.setWindowIcon(qta.icon("fa5s.info-circle", color="#89b4fa"))
 
     def setup_ui(self):
         self.setStyleSheet("""

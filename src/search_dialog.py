@@ -126,6 +126,7 @@ class SearchDialog(QDialog):
         self.thread = None
         self.worker = None
         self.setup_ui()
+        self.setWindowIcon(qta.icon("fa5s.search", color="#89b4fa"))
 
     def setup_ui(self):
         self.setStyleSheet("""

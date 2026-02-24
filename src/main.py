@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QLabel, QPushButton, QStatusBar, QLineEdit, QMessageBox,
                              QInputDialog, QMenu)
 from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent, QSortFilterProxyModel
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QIcon
 import qtawesome as qta
 
 from file_model import FileModel
@@ -253,6 +253,7 @@ class KiCommander(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("KiCommander Desktop")
+        self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
         self.settings = QSettings("KiCommander", "Desktop")
         
         self.restoreGeometry(self.settings.value("window/geometry", b""))
@@ -451,5 +452,6 @@ if __name__ == "__main__":
         app.setStyle("Fusion")
     
     window = KiCommander()
+    app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
     window.show()
     sys.exit(app.exec())
