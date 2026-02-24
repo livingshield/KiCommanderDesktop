@@ -2,7 +2,7 @@ import os
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, 
                              QPushButton, QLabel, QTableWidget, QTableWidgetItem,
                              QComboBox, QCheckBox, QProgressBar, QHeaderView,
-                             QGroupBox)
+                             QGroupBox, QFileDialog)
 from PySide6.QtCore import Qt, QThread, Signal, QObject
 import qtawesome as qta
 
@@ -229,6 +229,12 @@ class SearchDialog(QDialog):
         self.path_input = QLineEdit(self.start_path)
         self.path_input.setToolTip("Root directory to start the search from.")
         opts_layout.addWidget(self.path_input)
+        browse_btn = QPushButton()
+        browse_btn.setIcon(qta.icon("fa5s.folder-open", color="#f9e2af"))
+        browse_btn.setFixedWidth(40)
+        browse_btn.setToolTip("Browse for directory...")
+        browse_btn.clicked.connect(self.browse_directory)
+        opts_layout.addWidget(browse_btn)
         layout.addLayout(opts_layout)
 
         checks_layout = QHBoxLayout()
@@ -282,6 +288,13 @@ class SearchDialog(QDialog):
         # --- Status ---
         self.status_label = QLabel("")
         layout.addWidget(self.status_label)
+
+    def browse_directory(self):
+        directory = QFileDialog.getExistingDirectory(
+            self, "Select search directory", self.path_input.text()
+        )
+        if directory:
+            self.path_input.setText(directory)
 
     def start_search(self):
         name_pattern = self.search_input.text().strip()
