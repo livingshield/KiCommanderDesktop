@@ -352,6 +352,7 @@ class KiCommander(QMainWindow):
                 self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
         self.settings = QSettings("KiCommander", "Desktop")
         self.drag_pos = None
+        self._dragging = False
         
         self.restoreGeometry(self.settings.value("window/geometry", b""))
         self.restoreState(self.settings.value("window/state", b""))
@@ -459,12 +460,21 @@ class KiCommander(QMainWindow):
         if source is self.menuBar():
             if event.type() == QEvent.MouseButtonPress:
                 if event.button() == Qt.LeftButton:
+                    # Record anchor but DON'T consume event – menu items must still work
                     self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
-                    return True
+                    self._dragging = False
+                    return False  # pass through so menu opens normally
             elif event.type() == QEvent.MouseMove:
                 if event.buttons() == Qt.LeftButton and self.drag_pos:
-                    self.move(event.globalPos() - self.drag_pos)
-                    return True
+                    delta = event.globalPos() - (self.drag_pos + self.frameGeometry().topLeft())
+                    if not self._dragging and delta.manhattanLength() > 5:
+                        self._dragging = True
+                    if self._dragging:
+                        self.move(event.globalPos() - self.drag_pos)
+                        return True
+            elif event.type() == QEvent.MouseButtonRelease:
+                self.drag_pos = None
+                self._dragging = False
         return super().eventFilter(source, event)
 
     def op_view(self):
