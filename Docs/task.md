@@ -25,3 +25,7 @@
   - [x] Apply modern QSS theme and icons
   - [x] Integrate color coding and file-type icons
   - [x] Final polishing and verification
+- [x] Phase 6: Advanced Navigation
+  - [x] Implement Drive Selection Bar
+  - [x] Implement Quick Links Sidebar (Desktop, Downloads, etc.)
+  - [x] Auto-detect available drives

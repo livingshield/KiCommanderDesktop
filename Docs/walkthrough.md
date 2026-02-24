@@ -11,8 +11,9 @@ I have completed the foundation of KiCommander Desktop. The application is now f
 - **Selection:** Multi-selection supported via **Spacebar** (Total Commander style).
 - **File Operations:** Fully functional **F5 (Copy)**, **F6 (Move)**, **F7 (New Folder)**, and **F8 (Delete)**.
 - **Command Line:** Integrated command bar for executing system commands in the current directory.
-- **Modern UI:** Premium dark theme with **Catppuccin-inspired** colors and high-quality **FontAwesome** icons.
-- **File Icons:** Specific icons for folders, archives, executables, and images with color coding.
+- **Drive Selector:** Quick access buttons for all available system drives (C:, D:, etc.) above each panel.
+- **Quick Links Sidebar:** Vertical sidebar with shortcuts to common folders (Desktop, Downloads, Documents, etc.).
+- **Automatic Drive Detection:** Drives are automatically identified and mapped to the UI.
 - **State Persistence:** Remembers directories, window size, and position via `QSettings`.
 - **Configuration:** Secure API key management with Git protection.
 

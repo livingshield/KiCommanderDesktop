@@ -11,6 +11,7 @@ import qtawesome as qta
 from file_model import FileModel
 from fs_worker import ScanThread
 from file_ops import FileOpThread
+from navigation_utils import get_drives, get_quick_links
 
 class FilePanel(QWidget):
     def __init__(self, panel_id, initial_path):
@@ -27,13 +28,33 @@ class FilePanel(QWidget):
         self.refresh_path(self.current_path)
 
     def setup_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(2)
 
+        # Drive Selector Bar
+        self.drive_bar = QHBoxLayout()
+        self.drive_bar.setSpacing(2)
+        self.update_drive_bar()
+        main_layout.addLayout(self.drive_bar)
+
+        # Path label
         self.path_label = QLabel(self.current_path)
         self.path_label.setObjectName("PathLabel")
-        layout.addWidget(self.path_label)
+        main_layout.addWidget(self.path_label)
 
+        # Body with Sidebar and Table
+        body_layout = QHBoxLayout()
+        body_layout.setSpacing(2)
+
+        # Sidebar (Quick Links)
+        self.sidebar = QVBoxLayout()
+        self.sidebar.setSpacing(5)
+        self.sidebar.setAlignment(Qt.AlignTop)
+        self.update_sidebar()
+        body_layout.addLayout(self.sidebar)
+
+        # Table
         self.table = QTableView()
         self.model = FileModel()
         self.table.setModel(self.model)
@@ -47,7 +68,38 @@ class FilePanel(QWidget):
         self.table.doubleClicked.connect(self.on_double_click)
         self.table.installEventFilter(self)
         
-        layout.addWidget(self.table)
+        body_layout.addWidget(self.table, 1)
+        main_layout.addLayout(body_layout, 1)
+
+    def update_drive_bar(self):
+        # Clear existing
+        while self.drive_bar.count():
+            item = self.drive_bar.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        for drive in get_drives():
+            btn = QPushButton(drive.replace("\\", ""))
+            btn.setFixedWidth(40)
+            btn.setStyleSheet("padding: 2px; font-size: 9pt;")
+            btn.clicked.connect(lambda checked, d=drive: self.refresh_path(d))
+            self.drive_bar.addWidget(btn)
+        self.drive_bar.addStretch()
+
+    def update_sidebar(self):
+        # Clear existing
+        while self.sidebar.count():
+            item = self.sidebar.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        for link in get_quick_links():
+            btn = QPushButton()
+            btn.setIcon(qta.icon(link["icon"], color="#cdd6f4"))
+            btn.setFixedSize(32, 32)
+            btn.setToolTip(link["name"])
+            btn.clicked.connect(lambda checked, p=link["path"]: self.refresh_path(p))
+            self.sidebar.addWidget(btn)
 
     def eventFilter(self, source, event):
         if event.type() == QEvent.KeyPress and source is self.table:
