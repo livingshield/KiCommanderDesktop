@@ -92,6 +92,10 @@ class FilePanel(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
+        # Default column widths: Name wider, others compact
+        self.table.setColumnWidth(0, 280)  # Name
+        self.table.setColumnWidth(1, 60)   # Ext
+        self.table.setColumnWidth(2, 90)   # Size
         
         self.table.doubleClicked.connect(self.on_double_click)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)

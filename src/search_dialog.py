@@ -174,6 +174,14 @@ class SearchDialog(QDialog):
             QPushButton:hover { background-color: #45475a; border-color: #89b4fa; }
             QPushButton:disabled { color: #585b70; }
             QCheckBox { color: #cdd6f4; font-size: 10pt; spacing: 6px; }
+            QCheckBox::indicator {
+                width: 16px; height: 16px;
+                border: 1px solid #45475a; border-radius: 3px;
+                background-color: #11111b;
+            }
+            QCheckBox::indicator:checked {
+                background-color: #89b4fa; border-color: #89b4fa;
+            }
             QGroupBox {
                 color: #89b4fa; font-weight: bold; font-size: 10pt;
                 border: 1px solid #313244; border-radius: 6px;
@@ -183,6 +191,37 @@ class SearchDialog(QDialog):
                 subcontrol-origin: margin;
                 left: 10px; padding: 0 6px;
             }
+            QSpinBox, QComboBox, QDateEdit {
+                background-color: #11111b; border: 1px solid #313244;
+                border-radius: 4px; padding: 5px 8px; color: #cdd6f4;
+                font-size: 10pt; min-width: 70px;
+            }
+            QSpinBox:focus, QComboBox:focus, QDateEdit:focus {
+                border: 1px solid #89b4fa;
+            }
+            QSpinBox::up-button, QSpinBox::down-button {
+                background-color: #313244; border: none; width: 18px;
+            }
+            QSpinBox::up-button:hover, QSpinBox::down-button:hover {
+                background-color: #45475a;
+            }
+            QSpinBox::up-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid #cdd6f4; }
+            QSpinBox::down-arrow { image: none; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid #cdd6f4; }
+            QComboBox::drop-down {
+                border: none; background-color: #313244;
+                width: 24px; border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+            }
+            QComboBox::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #cdd6f4; }
+            QComboBox QAbstractItemView {
+                background-color: #1e1e2e; border: 1px solid #313244;
+                color: #cdd6f4; selection-background-color: #313244;
+                selection-color: #89b4fa;
+            }
+            QDateEdit::drop-down {
+                border: none; background-color: #313244;
+                width: 24px; border-top-right-radius: 4px; border-bottom-right-radius: 4px;
+            }
+            QDateEdit::down-arrow { image: none; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid #cdd6f4; }
             QTableWidget {
                 background-color: #181825; border: 1px solid #313244;
                 border-radius: 4px; gridline-color: #313244;
@@ -201,6 +240,9 @@ class SearchDialog(QDialog):
                 border: 1px solid #89b4fa; padding: 6px 10px;
                 border-radius: 4px; font-size: 9pt;
             }
+            QCalendarWidget { background-color: #1e1e2e; color: #cdd6f4; }
+            QCalendarWidget QToolButton { color: #cdd6f4; background-color: #313244; }
+            QCalendarWidget QAbstractItemView { background-color: #181825; color: #cdd6f4; selection-background-color: #89b4fa; }
         """)
         layout = QVBoxLayout(self)
 
