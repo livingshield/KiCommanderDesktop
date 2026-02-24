@@ -38,6 +38,9 @@ I have completed the foundation of KiCommander Desktop. The application is now f
    python src/main.py
    ```
 
+3. You can also run the pre-compiled version from the `bin/` directory:
+   - Run `bin/KiCommander.exe` (Windows).
+
 ## Next Steps
 
 - **Phase 4:** Adding interactive file operations (Copy, Move, Delete) and multi-selection logic.

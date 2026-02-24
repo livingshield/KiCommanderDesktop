@@ -252,9 +252,14 @@ class KiCommander(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # Load stylesheet relative to this script
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    style_path = os.path.join(script_dir, "style.qss")
+    # Load stylesheet relative to this script (handling PyInstaller bundle)
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller bundled path
+        style_path = os.path.join(sys._MEIPASS, "style.qss")
+    else:
+        # Normal Python execution path
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        style_path = os.path.join(script_dir, "style.qss")
     
     if os.path.exists(style_path):
         with open(style_path, "r") as f:
