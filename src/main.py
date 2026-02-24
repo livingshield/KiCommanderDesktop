@@ -31,7 +31,10 @@ from search_dialog import SearchDialog
 from preview_dialog import PreviewDialog
 from properties_dialog import PropertiesDialog
 from archive_vfs import ArchiveVFS, is_archive
+from ftp_vfs import FTPVFS
 from plugin_manager import discover_plugins
+from fs_worker import ScanThread, FileInfo, VfsThread
+import json
 
 class FilePanel(QWidget):
     def __init__(self, panel_id, initial_path):
@@ -52,9 +55,10 @@ class FilePanel(QWidget):
         self._debounce.setInterval(300)
         self._debounce.timeout.connect(self._do_auto_refresh)
 
-        # Archive VFS state
-        self._archive_vfs = None       # ArchiveVFS instance or None
-        self._archive_inner = ""       # current path inside archive
+        # VFS state (unified for archives and network protocols)
+        self._vfs = None           # Any VFS instance supporting list_dir/extract_file
+        self._vfs_inner = ""       # Current path inside VFS
+        self._vfs_type = None      # "archive", "ftp", etc.
 
         self.setup_ui()
         self.refresh_path(self.current_path)
@@ -172,22 +176,23 @@ class FilePanel(QWidget):
                 row = self.proxy.mapToSource(index).row()
             file_info = self.model.get_file(row)
             if file_info and file_info.name != "..":
-                # --- Inside archive context menu ---
-                if self._archive_vfs:
+                # --- Inside VFS context menu ---
+                if self._vfs:
                     if not file_info.is_dir:
-                        menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview", lambda: self._archive_preview(file_info))
+                        menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview", lambda: self._vfs_preview(file_info))
                         menu.addSeparator()
                     menu.addAction(qta.icon("fa5s.file-export", color="#89b4fa"), "Extract Here",
                                    lambda: self._extract_here(file_info))
-                    menu.addAction(qta.icon("fa5s.file-export", color="#f9e2af"), "Extract All to...",
-                                   lambda: self._extract_all())
+                    if self._vfs_type == "archive":
+                        menu.addAction(qta.icon("fa5s.file-export", color="#f9e2af"), "Extract All to...",
+                                       lambda: self._extract_all())
                 else:
                     # --- Normal filesystem context menu ---
                     menu.addAction(qta.icon("fa5s.folder-open", color="#89b4fa"), "Open", lambda: self.on_double_click(index))
                     menu.addSeparator()
                     if is_archive(file_info.full_path):
                         menu.addAction(qta.icon("fa5s.file-archive", color="#cba6f7"), "Browse Archive",
-                                       lambda: self._enter_archive(file_info.full_path))
+                                       lambda: self._enter_vfs(ArchiveVFS(file_info.full_path), "archive"))
                         menu.addSeparator()
                     menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview (F3)", lambda: self.preview_file(file_info.full_path))
                     menu.addAction(qta.icon("fa5s.edit", color="#f9e2af"), "Rename (F2)", lambda: self.rename_file(file_info))
@@ -198,36 +203,37 @@ class FilePanel(QWidget):
                     menu.addSeparator()
                     menu.addAction(qta.icon("fa5s.info-circle", color="#cba6f7"), "Properties", lambda: self.show_properties(file_info.full_path))
         
-        if not self._archive_vfs:
+        if not self._vfs:
             menu.addSeparator()
             menu.addAction(qta.icon("fa5s.sync", color="#89b4fa"), "Refresh", lambda: self.refresh_path(self.current_path))
             menu.addAction(qta.icon("fa5s.folder-plus", color="#a6e3a1"), "New Folder (F7)", lambda: None)
         menu.exec(self.table.viewport().mapToGlobal(pos))
 
-    def _enter_archive(self, path):
-        """Enter archive VFS mode."""
-        self._archive_vfs = ArchiveVFS(path)
-        self._archive_inner = ""
-        self._refresh_archive()
+    def _enter_vfs(self, vfs, vfs_type, inner=""):
+        """Enter VFS mode (archive, ftp, etc.)."""
+        self._vfs = vfs
+        self._vfs_type = vfs_type
+        self._vfs_inner = inner
+        self._refresh_vfs()
 
-    def _archive_preview(self, file_info):
-        """Extract file from archive to temp and preview."""
+    def _vfs_preview(self, file_info):
+        """Extract file from VFS to temp and preview."""
         import tempfile
         dest = tempfile.mkdtemp(prefix="kicmd_")
-        extracted = self._archive_vfs.extract_file(file_info.full_path, dest)
+        extracted = self._vfs.extract_file(file_info.full_path, dest)
         if extracted and os.path.exists(extracted):
             self.preview_file(extracted)
 
     def _extract_here(self, file_info):
         """Extract selected item to current real directory."""
-        self._archive_vfs.extract_file(file_info.full_path, self.current_path)
+        self._vfs.extract_file(file_info.full_path, self.current_path)
 
     def _extract_all(self):
-        """Extract entire archive to a chosen directory."""
+        """Extract entire VFS content to a chosen directory."""
         from PySide6.QtWidgets import QFileDialog
         dest = QFileDialog.getExistingDirectory(self, "Extract to...", self.current_path)
         if dest:
-            self._archive_vfs.extract_all(dest)
+            self._vfs.extract_all(dest)
 
     def preview_file(self, path):
         if os.path.isfile(path):
@@ -293,9 +299,10 @@ class FilePanel(QWidget):
         return super().eventFilter(source, event)
 
     def refresh_path(self, path):
-        # Exit archive mode if entering a real path
-        self._archive_vfs = None
-        self._archive_inner = ""
+        # Exit VFS mode if entering a real path
+        self._vfs = None
+        self._vfs_inner = ""
+        self._vfs_type = None
 
         self.current_path = os.path.abspath(path)
         self.path_label.setText(self.current_path)
@@ -312,16 +319,29 @@ class FilePanel(QWidget):
         self.thread.worker.finished.connect(self.on_scan_finished)
         self.thread.start()
 
-    def _refresh_archive(self):
-        """List contents of the current archive + inner path."""
-        archive_name = os.path.basename(self._archive_vfs.archive_path)
-        inner = self._archive_inner.strip("/")
-        if inner:
-            self.path_label.setText(f"{archive_name}/{inner}/")
-        else:
-            self.path_label.setText(f"{archive_name}/")
+    def _refresh_vfs(self):
+        """List contents of the current VFS + inner path."""
+        if not self._vfs: return
 
-        files = self._archive_vfs.list_dir(self._archive_inner)
+        if self._vfs_type == "archive":
+            base_name = os.path.basename(self._vfs.archive_path)
+        elif self._vfs_type == "ftp":
+            base_name = f"ftp://{self._vfs.host}"
+        else:
+            base_name = "VFS"
+
+        inner = self._vfs_inner.strip("/")
+        if inner:
+            self.path_label.setText(f"{base_name}/{inner}/")
+        else:
+            self.path_label.setText(f"{base_name}/")
+
+        # Use VfsThread for asynchronous listing
+        self.thread = VfsThread(self._vfs, self._vfs_inner)
+        self.thread.worker.finished.connect(self._on_vfs_scan_finished)
+        self.thread.start()
+
+    def _on_vfs_scan_finished(self, files):
         # Add '..' entry to go back
         up = FileInfo(name=" .. ", ext="", size="", date="", is_dir=True,
                       full_path="..")
@@ -379,31 +399,27 @@ class FilePanel(QWidget):
         if not file_info:
             return
 
-        # --- Inside an archive ---
-        if self._archive_vfs:
+        # --- Inside VFS (archive, ftp, etc.) ---
+        if self._vfs:
             if file_info.name == " .. ":
-                if self._archive_inner:
-                    # Go up inside archive
-                    parts = self._archive_inner.strip("/").rsplit("/", 1)
-                    self._archive_inner = parts[0] + "/" if len(parts) > 1 else ""
+                if self._vfs_inner and self._vfs_inner not in ["/", ""]:
+                    # Go up inside VFS
+                    parts = self._vfs_inner.strip("/").rsplit("/", 1)
+                    self._vfs_inner = "/" + parts[0] if len(parts) > 1 else "/"
                     if len(parts) == 1:
-                        self._archive_inner = ""
-                    self._refresh_archive()
+                        self._vfs_inner = "/"
+                    self._refresh_vfs()
                 else:
-                    # Exit archive back to real filesystem
-                    self._archive_vfs = None
-                    self._archive_inner = ""
+                    # Exit VFS back to real filesystem
+                    self._vfs = None
+                    self._vfs_inner = ""
+                    self._vfs_type = None
                     self.refresh_path(self.current_path)
             elif file_info.is_dir:
-                self._archive_inner = file_info.full_path
-                self._refresh_archive()
+                self._vfs_inner = file_info.full_path
+                self._refresh_vfs()
             else:
-                # Extract file to temp and open
-                import tempfile
-                dest = tempfile.mkdtemp(prefix="kicmd_")
-                extracted = self._archive_vfs.extract_file(file_info.full_path, dest)
-                if extracted and os.path.exists(extracted):
-                    os.startfile(extracted)
+                self._vfs_preview(file_info)
             return
 
         # --- Real filesystem ---
@@ -412,10 +428,7 @@ class FilePanel(QWidget):
                 self.toggle_filter()
             self.refresh_path(file_info.full_path)
         elif is_archive(file_info.full_path):
-            # Enter archive
-            self._archive_vfs = ArchiveVFS(file_info.full_path)
-            self._archive_inner = ""
-            self._refresh_archive()
+            self._enter_vfs(ArchiveVFS(file_info.full_path), "archive")
         else:
             os.startfile(file_info.full_path)
 
@@ -535,6 +548,7 @@ class KiCommander(QMainWindow):
         cmd_menu.addAction("Refresh", self.refresh_all, "Ctrl+R")
         cmd_menu.addAction("Search", self.op_search, "Alt+F7")
         cmd_menu.addAction("Filter", self.op_filter, "Ctrl+F")
+        cmd_menu.addAction(qta.icon("fa5s.globe", color="#f9e2af"), "Connect to Test FTP", self.op_connect_ftp, "Ctrl+K")
 
         # Load plugins
         if getattr(sys, '_MEIPASS', None):
@@ -693,6 +707,23 @@ class KiCommander(QMainWindow):
             plugin.action(selected, active)
         except Exception as e:
             QMessageBox.warning(self, "Plugin Error", f"{plugin.name} failed:\n{e}")
+
+    def op_connect_ftp(self):
+        """Connect to the test FTP server using credentials from secrets.json."""
+        try:
+            with open("secrets.json", "r") as f:
+                config = json.load(f)
+            ftp_conf = config.get("ftp")
+            if not ftp_conf:
+                QMessageBox.critical(self, "Config Error", "FTP credentials not found in secrets.json")
+                return
+            
+            vfs = FTPVFS(ftp_conf["host"], ftp_conf["user"], ftp_conf["pass"])
+            # The actual connection will happen in the VfsThread during refresh
+            active = self.get_active_panel()
+            active._enter_vfs(vfs, "ftp", "/")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load FTP config: {e}")
 
     def op_mkdir(self):
         active = self.get_active_panel()

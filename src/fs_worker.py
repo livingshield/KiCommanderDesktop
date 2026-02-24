@@ -74,6 +74,34 @@ class ScanWorker(QObject):
         s = round(size_bytes / p, 2)
         return f"{s} {size_name[i]}"
 
+class VfsWorker(QObject):
+    finished = Signal(list)
+    error = Signal(str)
+
+    def __init__(self, vfs, inner_path):
+        super().__init__()
+        self.vfs = vfs
+        self.inner_path = inner_path
+
+    def run(self):
+        try:
+            files = self.vfs.list_dir(self.inner_path)
+            # Sorting is usually handled by the VFS or the Model, 
+            # but we can ensure consistent baseline here.
+            files.sort(key=lambda x: (not x.is_dir, x.name.lower()))
+            self.finished.emit(files)
+        except Exception as e:
+            self.error.emit(str(e))
+
+class VfsThread(QThread):
+    def __init__(self, vfs, inner_path):
+        super().__init__()
+        self.worker = VfsWorker(vfs, inner_path)
+        self.worker.moveToThread(self)
+        self.started.connect(self.worker.run)
+        self.worker.finished.connect(self.quit)
+        self.worker.error.connect(self.quit)
+
 class ScanThread(QThread):
     def __init__(self, path):
         super().__init__()
