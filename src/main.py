@@ -10,6 +10,19 @@ from PySide6.QtGui import QAction, QIcon, QPixmap
 import qtawesome as qta
 import ctypes
 
+def get_assets_dir():
+    """Return the assets directory regardless of whether we're running as a
+    plain Python script or a PyInstaller bundle."""
+    if getattr(sys, '_MEIPASS', None):
+        # PyInstaller extracts everything to sys._MEIPASS at runtime
+        return os.path.join(sys._MEIPASS, 'assets')
+    else:
+        # Running as a normal .py script from  src/
+        src_dir = os.path.dirname(os.path.abspath(__file__))
+        return os.path.abspath(os.path.join(src_dir, '..', 'assets'))
+
+ASSETS_DIR = get_assets_dir()
+
 from file_model import FileModel
 from fs_worker import ScanThread
 from file_ops import FileOpThread
@@ -263,9 +276,7 @@ class CustomTitleBar(QWidget):
         
         # Icon and title
         self.icon_label = QLabel()
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        assets_dir = os.path.abspath(os.path.join(base_dir, "..", "assets"))
-        icon_path = os.path.join(assets_dir, "icon.png")
+        icon_path = os.path.join(ASSETS_DIR, "icon.png")
         if os.path.exists(icon_path):
             self.icon_label.setPixmap(QPixmap(icon_path).scaled(22, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
@@ -330,13 +341,11 @@ class KiCommander(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground)
         
         self.setWindowTitle("KiCommander Desktop")
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        assets_dir = os.path.abspath(os.path.join(base_dir, "..", "assets"))
-        icon_path = os.path.join(assets_dir, "icon.ico")
+        icon_path = os.path.join(ASSETS_DIR, "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         else:
-            icon_path = os.path.join(assets_dir, "icon.png")
+            icon_path = os.path.join(ASSETS_DIR, "icon.png")
             if os.path.exists(icon_path):
                 self.setWindowIcon(QIcon(icon_path))
             else:
@@ -561,37 +570,26 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     
-    # Load stylesheet from assets
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    project_root = os.path.dirname(script_dir)
-    assets_dir = os.path.join(project_root, "assets")
-    style_path = os.path.join(assets_dir, "style.qss")
-    
+    # Load stylesheet
+    style_path = os.path.join(ASSETS_DIR, "style.qss")
     if os.path.exists(style_path):
         with open(style_path, "r") as f:
             app.setStyleSheet(f.read())
     else:
-        # Fallback to local src if assets not found
-        style_path = os.path.join(script_dir, "style.qss")
-        if os.path.exists(style_path):
-            with open(style_path, "r") as f:
-                app.setStyleSheet(f.read())
-        else:
-            app.setStyle("Fusion")
+        app.setStyle("Fusion")
     
     window = KiCommander()
     
-    # Set App Icon robustly
-    icon_path = os.path.join(assets_dir, "icon.ico")
+    # Set App Icon
+    icon_path = os.path.join(ASSETS_DIR, "icon.ico")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
     else:
-        # Fallback to PNG
-        icon_path = os.path.join(assets_dir, "icon.png")
+        icon_path = os.path.join(ASSETS_DIR, "icon.png")
         if os.path.exists(icon_path):
             app.setWindowIcon(QIcon(icon_path))
         else:
             app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
-            
+    
     window.show()
     sys.exit(app.exec())
