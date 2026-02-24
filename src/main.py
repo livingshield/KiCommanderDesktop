@@ -4,14 +4,18 @@ import subprocess
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTableView, QHeaderView, QMenuBar, 
                              QLabel, QPushButton, QStatusBar, QLineEdit, QMessageBox,
-                             QInputDialog)
-from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent
+                             QInputDialog, QMenu)
+from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent, QSortFilterProxyModel
+from PySide6.QtGui import QAction
 import qtawesome as qta
 
 from file_model import FileModel
 from fs_worker import ScanThread
 from file_ops import FileOpThread
 from navigation_utils import get_drives, get_quick_links
+from search_dialog import SearchDialog
+from preview_dialog import PreviewDialog
+from properties_dialog import PropertiesDialog
 
 class FilePanel(QWidget):
     def __init__(self, panel_id, initial_path):
@@ -29,6 +33,7 @@ class FilePanel(QWidget):
 
     def setup_ui(self):
         main_layout = QVBoxLayout(self)
+        self.filter_visible = False
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(2)
 
@@ -67,10 +72,26 @@ class FilePanel(QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
         
         self.table.doubleClicked.connect(self.on_double_click)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self.show_context_menu)
         self.table.installEventFilter(self)
         
         body_layout.addWidget(self.table, 1)
         main_layout.addLayout(body_layout, 1)
+
+        # Inline filter bar (hidden by default)
+        self.filter_bar = QLineEdit()
+        self.filter_bar.setPlaceholderText("Type to filter files... (Escape to close)")
+        self.filter_bar.setObjectName("FilterBar")
+        self.filter_bar.textChanged.connect(self.on_filter_changed)
+        self.filter_bar.setVisible(False)
+        main_layout.addWidget(self.filter_bar)
+
+        # Proxy model for filtering
+        self.proxy = QSortFilterProxyModel()
+        self.proxy.setSourceModel(self.model)
+        self.proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.proxy.setFilterKeyColumn(0)
 
     def update_drive_bar(self):
         # Clear existing
@@ -103,6 +124,66 @@ class FilePanel(QWidget):
             btn.clicked.connect(lambda checked, p=link["path"]: self.refresh_path(p))
             self.sidebar.addWidget(btn)
 
+    def show_context_menu(self, pos):
+        index = self.table.indexAt(pos)
+        menu = QMenu(self)
+        
+        if index.isValid():
+            row = index.row()
+            if self.filter_visible:
+                row = self.proxy.mapToSource(index).row()
+            file_info = self.model.get_file(row)
+            if file_info and file_info.name != "..":
+                menu.addAction(qta.icon("fa5s.folder-open", color="#89b4fa"), "Open", lambda: self.on_double_click(index))
+                menu.addSeparator()
+                menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview (F3)", lambda: self.preview_file(file_info.full_path))
+                menu.addAction(qta.icon("fa5s.edit", color="#f9e2af"), "Rename (F2)", lambda: self.rename_file(file_info))
+                menu.addSeparator()
+                menu.addAction(qta.icon("fa5s.copy", color="#cdd6f4"), "Copy (F5)", lambda: None)
+                menu.addAction(qta.icon("fa5s.external-link-alt", color="#cdd6f4"), "Move (F6)", lambda: None)
+                menu.addAction(qta.icon("fa5s.trash-alt", color="#f38ba8"), "Delete (F8)", lambda: None)
+                menu.addSeparator()
+                menu.addAction(qta.icon("fa5s.info-circle", color="#cba6f7"), "Properties", lambda: self.show_properties(file_info.full_path))
+        
+        menu.addSeparator()
+        menu.addAction(qta.icon("fa5s.sync", color="#89b4fa"), "Refresh", lambda: self.refresh_path(self.current_path))
+        menu.addAction(qta.icon("fa5s.folder-plus", color="#a6e3a1"), "New Folder (F7)", lambda: None)
+        menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def preview_file(self, path):
+        if os.path.isfile(path):
+            dlg = PreviewDialog(path, self)
+            dlg.exec()
+
+    def show_properties(self, path):
+        dlg = PropertiesDialog(path, self)
+        dlg.exec()
+
+    def rename_file(self, file_info):
+        new_name, ok = QInputDialog.getText(self, "Rename", "New name:", text=file_info.name)
+        if ok and new_name and new_name != file_info.name:
+            old = file_info.full_path
+            new = os.path.join(os.path.dirname(old), new_name)
+            try:
+                os.rename(old, new)
+                self.refresh_path(self.current_path)
+            except OSError as e:
+                QMessageBox.warning(self, "Rename Failed", str(e))
+
+    def toggle_filter(self):
+        self.filter_visible = not self.filter_visible
+        self.filter_bar.setVisible(self.filter_visible)
+        if self.filter_visible:
+            self.table.setModel(self.proxy)
+            self.filter_bar.setFocus()
+        else:
+            self.filter_bar.clear()
+            self.table.setModel(self.model)
+            self.table.setFocus()
+
+    def on_filter_changed(self, text):
+        self.proxy.setFilterFixedString(text)
+
     def eventFilter(self, source, event):
         if event.type() == QEvent.KeyPress and source is self.table:
             # Enter to open
@@ -115,10 +196,21 @@ class FilePanel(QWidget):
             elif event.key() == Qt.Key_Space:
                 index = self.table.currentIndex()
                 if index.isValid():
-                    # Just move down after selection
                     self.table.selectionModel().select(index, self.table.selectionModel().Toggle | self.table.selectionModel().Rows)
                     self.table.setCurrentIndex(self.model.index(index.row() + 1, 0))
                     return True
+            # F2 to rename
+            elif event.key() == Qt.Key_F2:
+                index = self.table.currentIndex()
+                if index.isValid():
+                    file_info = self.model.get_file(index.row())
+                    if file_info and file_info.name != "..":
+                        self.rename_file(file_info)
+                        return True
+            # Escape to close filter
+            elif event.key() == Qt.Key_Escape and self.filter_visible:
+                self.toggle_filter()
+                return True
         return super().eventFilter(source, event)
 
     def refresh_path(self, path):
@@ -136,12 +228,16 @@ class FilePanel(QWidget):
         self.table.setFocus()
 
     def on_double_click(self, index):
-        file_info = self.model.get_file(index.row())
+        row = index.row()
+        if self.filter_visible:
+            row = self.proxy.mapToSource(index).row()
+        file_info = self.model.get_file(row)
         if file_info:
             if file_info.is_dir:
+                if self.filter_visible:
+                    self.toggle_filter()
                 self.refresh_path(file_info.full_path)
             else:
-                # Open with default OS app
                 os.startfile(file_info.full_path)
 
     def get_selected_paths(self):
@@ -173,6 +269,8 @@ class KiCommander(QMainWindow):
         
         cmd_menu = menubar.addMenu("&Commands")
         cmd_menu.addAction("Refresh", self.refresh_all, "Ctrl+R")
+        cmd_menu.addAction("Search (Alt+F7)", self.op_search, "Alt+F7")
+        cmd_menu.addAction("Filter (Ctrl+F)", self.op_filter, "Ctrl+F")
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -200,8 +298,8 @@ class KiCommander(QMainWindow):
         # Bottom Buttons
         btn_layout = QHBoxLayout()
         self.btn_configs = [
-            ("F3 View", "eye", self.op_not_implemented, "View file content"),
-            ("F4 Edit", "edit", self.op_not_implemented, "Edit selected file"),
+            ("F3 View", "eye", self.op_view, "Preview file content (text, image, hex)"),
+            ("F4 Edit", "edit", self.op_edit, "Open file in default editor"),
             ("F5 Copy", "copy", self.op_copy, "Copy selected files to target panel"),
             ("F6 Move", "external-link-alt", self.op_move, "Move selected files to target panel"),
             ("F7 NewFolder", "folder-plus", self.op_mkdir, "Create a new directory"),
@@ -241,8 +339,33 @@ class KiCommander(QMainWindow):
         self.left_panel.refresh_path(self.left_panel.current_path)
         self.right_panel.refresh_path(self.right_panel.current_path)
 
-    def op_not_implemented(self):
-        QMessageBox.information(self, "Info", "Functionality coming soon!")
+    def op_view(self):
+        active = self.get_active_panel()
+        indices = active.table.selectionModel().selectedRows()
+        if indices:
+            row = indices[0].row()
+            f = active.model.get_file(row)
+            if f and not f.is_dir:
+                active.preview_file(f.full_path)
+
+    def op_edit(self):
+        active = self.get_active_panel()
+        indices = active.table.selectionModel().selectedRows()
+        if indices:
+            row = indices[0].row()
+            f = active.model.get_file(row)
+            if f and not f.is_dir:
+                os.startfile(f.full_path)
+
+    def op_search(self):
+        active = self.get_active_panel()
+        dlg = SearchDialog(active.current_path, self)
+        dlg.navigate_to.connect(active.refresh_path)
+        dlg.exec()
+
+    def op_filter(self):
+        active = self.get_active_panel()
+        active.toggle_filter()
 
     def op_mkdir(self):
         active = self.get_active_panel()
@@ -288,14 +411,16 @@ class KiCommander(QMainWindow):
         self.refresh_all()
 
     def keyPressEvent(self, event):
-        # Override for F-keys
         key = event.key()
-        if key == Qt.Key_F3: self.op_not_implemented()
-        elif key == Qt.Key_F4: self.op_not_implemented()
+        mods = event.modifiers()
+        if key == Qt.Key_F3: self.op_view()
+        elif key == Qt.Key_F4: self.op_edit()
         elif key == Qt.Key_F5: self.op_copy()
         elif key == Qt.Key_F6: self.op_move()
         elif key == Qt.Key_F7: self.op_mkdir()
         elif key == Qt.Key_F8: self.op_delete()
+        elif key == Qt.Key_F7 and mods & Qt.AltModifier: self.op_search()
+        elif key == Qt.Key_F and mods & Qt.ControlModifier: self.op_filter()
         elif key == Qt.Key_Tab:
             if self.left_panel.table.hasFocus(): self.right_panel.table.setFocus()
             else: self.left_panel.table.setFocus()

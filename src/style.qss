@@ -116,3 +116,82 @@ QStatusBar {
     background-color: #11111b;
     color: #6c7086;
 }
+
+/* Filter Bar */
+QLineEdit#FilterBar {
+    background-color: #181825;
+    border: 2px solid #f9e2af;
+    border-radius: 4px;
+    padding: 6px;
+    color: #f9e2af;
+    font-weight: bold;
+}
+
+QLineEdit#FilterBar:focus {
+    border-color: #a6e3a1;
+}
+
+/* Tooltips */
+QToolTip {
+    background-color: #313244;
+    color: #cdd6f4;
+    border: 1px solid #89b4fa;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-size: 9pt;
+}
+
+/* Dialog styling */
+QDialog {
+    background-color: #1e1e2e;
+}
+
+QPlainTextEdit {
+    background-color: #181825;
+    color: #cdd6f4;
+    border: 1px solid #313244;
+    border-radius: 4px;
+    padding: 4px;
+    font-family: 'Consolas', 'Courier New', monospace;
+}
+
+QTableWidget {
+    background-color: #181825;
+    border: 1px solid #313244;
+    border-radius: 4px;
+    gridline-color: #313244;
+    selection-background-color: #45475a;
+    selection-color: #89b4fa;
+}
+
+QTableWidget::item {
+    padding: 4px;
+}
+
+QCheckBox {
+    color: #cdd6f4;
+    spacing: 5px;
+}
+
+QFormLayout QLabel {
+    color: #a6adc8;
+    font-weight: bold;
+}
+
+QScrollArea {
+    background-color: #181825;
+    border: none;
+}
+
+QProgressBar {
+    background-color: #313244;
+    border: 1px solid #45475a;
+    border-radius: 4px;
+    text-align: center;
+    color: #cdd6f4;
+}
+
+QProgressBar::chunk {
+    background-color: #89b4fa;
+    border-radius: 3px;
+}
