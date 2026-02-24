@@ -249,9 +249,75 @@ class FilePanel(QWidget):
                 paths.append(f.full_path)
         return paths
 
+class CustomTitleBar(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent = parent
+        self.setFixedHeight(35)
+        self.setObjectName("TitleBar")
+        
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(10, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        # Icon and title
+        self.icon_label = QLabel()
+        self.icon_label.setPixmap(qta.icon("fa5s.rocket", color="#89b4fa").pixmap(20, 20))
+        layout.addWidget(self.icon_label)
+        
+        self.title_label = QLabel("KiCommander Desktop")
+        self.title_label.setObjectName("TitleLabel")
+        layout.addWidget(self.title_label)
+        
+        layout.addStretch()
+        
+        # Window buttons
+        btn_style = "QPushButton { border: none; padding: 5px; background: transparent; } QPushButton:hover { background-color: #313244; }"
+        
+        self.min_btn = QPushButton()
+        self.min_btn.setIcon(qta.icon("fa5s.minus", color="#cdd6f4"))
+        self.min_btn.setStyleSheet(btn_style)
+        self.min_btn.clicked.connect(self.parent.showMinimized)
+        layout.addWidget(self.min_btn)
+        
+        self.max_btn = QPushButton()
+        self.max_btn.setIcon(qta.icon("fa5s.expand", color="#cdd6f4"))
+        self.max_btn.setStyleSheet(btn_style)
+        self.max_btn.clicked.connect(self.toggle_maximize)
+        layout.addWidget(self.max_btn)
+        
+        self.close_btn = QPushButton()
+        self.close_btn.setIcon(qta.icon("fa5s.times", color="#cdd6f4"))
+        self.close_btn.setStyleSheet("QPushButton { border: none; padding: 5px; background: transparent; } QPushButton:hover { background-color: #f38ba8; }")
+        self.close_btn.clicked.connect(self.parent.close)
+        layout.addWidget(self.close_btn)
+        
+        self.drag_pos = None
+
+    def toggle_maximize(self):
+        if self.parent.isMaximized():
+            self.parent.showNormal()
+            self.max_btn.setIcon(qta.icon("fa5s.expand", color="#cdd6f4"))
+        else:
+            self.parent.showMaximized()
+            self.max_btn.setIcon(qta.icon("fa5s.compress", color="#cdd6f4"))
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.drag_pos = event.globalPos() - self.parent.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if event.buttons() == Qt.LeftButton and self.drag_pos:
+            self.parent.move(event.globalPos() - self.drag_pos)
+            event.accept()
+
 class KiCommander(QMainWindow):
     def __init__(self):
         super().__init__()
+        self.setWindowFlags(Qt.FramelessWindowHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        
         self.setWindowTitle("KiCommander Desktop")
         self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
         self.settings = QSettings("KiCommander", "Desktop")
@@ -274,8 +340,21 @@ class KiCommander(QMainWindow):
         cmd_menu.addAction("Filter (Ctrl+F)", self.op_filter, "Ctrl+F")
 
         central_widget = QWidget()
+        central_widget.setObjectName("CentralWidget")
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Title Bar
+        self.title_bar = CustomTitleBar(self)
+        main_layout.addWidget(self.title_bar)
+
+        # Content Widget
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(5, 5, 5, 5)
+        main_layout.addWidget(content_widget, 1)
 
         panels_layout = QHBoxLayout()
         self.left_panel = FilePanel("left", os.path.expanduser("~"))
@@ -283,7 +362,7 @@ class KiCommander(QMainWindow):
         
         panels_layout.addWidget(self.left_panel)
         panels_layout.addWidget(self.right_panel)
-        main_layout.addLayout(panels_layout, 1)
+        content_layout.addLayout(panels_layout, 1)
 
         # Command Line
         cmd_layout = QHBoxLayout()
@@ -294,7 +373,7 @@ class KiCommander(QMainWindow):
         self.cmd_input.setToolTip("Type command and press Enter (e.g., notepad, cmd, or python script)")
         self.cmd_input.returnPressed.connect(self.execute_command)
         cmd_layout.addWidget(self.cmd_input)
-        main_layout.addLayout(cmd_layout)
+        content_layout.addLayout(cmd_layout)
 
         # Bottom Buttons
         btn_layout = QHBoxLayout()
@@ -315,10 +394,12 @@ class KiCommander(QMainWindow):
             btn.clicked.connect(callback)
             btn_layout.addWidget(btn)
         
-        main_layout.addLayout(btn_layout)
+        content_layout.addLayout(btn_layout)
 
-        self.setStatusBar(QStatusBar())
-        self.statusBar().showMessage("Ready")
+        # Status Bar
+        self.sb = QStatusBar()
+        content_layout.addWidget(self.sb)
+        self.sb.showMessage("Ready")
 
     def get_active_panel(self):
         return self.left_panel if self.left_panel.table.hasFocus() else self.right_panel
@@ -436,20 +517,22 @@ class KiCommander(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # Load stylesheet relative to this script (handling PyInstaller bundle)
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller bundled path
-        style_path = os.path.join(sys._MEIPASS, "style.qss")
-    else:
-        # Normal Python execution path
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        style_path = os.path.join(script_dir, "style.qss")
+    # Load stylesheet from assets
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(script_dir)
+    style_path = os.path.join(project_root, "assets", "style.qss")
     
     if os.path.exists(style_path):
         with open(style_path, "r") as f:
             app.setStyleSheet(f.read())
     else:
-        app.setStyle("Fusion")
+        # Fallback to local src if assets not found
+        style_path = os.path.join(script_dir, "style.qss")
+        if os.path.exists(style_path):
+            with open(style_path, "r") as f:
+                app.setStyleSheet(f.read())
+        else:
+            app.setStyle("Fusion")
     
     window = KiCommander()
     app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
