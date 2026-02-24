@@ -13,10 +13,10 @@
   - [x] Setup `.gitignore` for secrets and documentation
   - [x] Implement `config_manager.py` for API keys
   - [x] Create `secrets.json` and sync with GitHub
-- [ ] Phase 3: Navigation & State Persistence
-  - [ ] Implement navigation logic (double-click, Enter, `..`)
-  - [ ] Integrate `QSettings` to remember last paths and window state
-  - [ ] Implement menu bar and bottom informational bars
+- [x] Phase 3: Navigation & State Persistence
+  - [x] Implement navigation logic (double-click, Enter, `..`)
+  - [x] Integrate `QSettings` to remember last paths and window state
+  - [x] Implement menu bar and bottom informational bars
 - [ ] Phase 4: Interactive Operations (F3-F8)
   - [ ] Implement multi-selection logic (spacebar etc.)
   - [ ] Implement F3 (View), F5/F6 (Copy/Move), F7 (New Folder), F8 (Delete)
