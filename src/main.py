@@ -316,6 +316,10 @@ class CustomTitleBar(QWidget):
             self.parent.move(event.globalPos() - self.drag_pos)
             event.accept()
 
+    def mouseDoubleClickEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.toggle_maximize()
+
 class KiCommander(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -329,6 +333,7 @@ class KiCommander(QMainWindow):
         else:
             self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
         self.settings = QSettings("KiCommander", "Desktop")
+        self.drag_pos = None
         
         self.restoreGeometry(self.settings.value("window/geometry", b""))
         self.restoreState(self.settings.value("window/state", b""))
@@ -346,6 +351,9 @@ class KiCommander(QMainWindow):
         cmd_menu.addAction("Refresh", self.refresh_all, "Ctrl+R")
         cmd_menu.addAction("Search (Alt+F7)", self.op_search, "Alt+F7")
         cmd_menu.addAction("Filter (Ctrl+F)", self.op_filter, "Ctrl+F")
+        
+        # Enable dragging through the menubar
+        menubar.installEventFilter(self)
 
         central_widget = QWidget()
         central_widget.setObjectName("CentralWidget")
@@ -428,6 +436,18 @@ class KiCommander(QMainWindow):
     def refresh_all(self):
         self.left_panel.refresh_path(self.left_panel.current_path)
         self.right_panel.refresh_path(self.right_panel.current_path)
+
+    def eventFilter(self, source, event):
+        if source is self.menuBar():
+            if event.type() == QEvent.MouseButtonPress:
+                if event.button() == Qt.LeftButton:
+                    self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+                    return True
+            elif event.type() == QEvent.MouseMove:
+                if event.buttons() == Qt.LeftButton and self.drag_pos:
+                    self.move(event.globalPos() - self.drag_pos)
+                    return True
+        return super().eventFilter(source, event)
 
     def op_view(self):
         active = self.get_active_panel()
