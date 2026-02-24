@@ -35,8 +35,9 @@ KiCommanderDesktop/
 ├── bin/                    # Zkompilovaná spustitelná verze
 │   └── KiCommander.exe     # Samostatný EXE soubor pro Windows
 ├── build/                  # Dočasné soubory pro kompilaci (ignorováno gitem)
-├── Docs/                   # Dokumentace a plány vývoje
+├── doc/                    # Dokumentace a plány vývoje
 │   ├── implementation_plan.md
+│   ├── README.md
 │   ├── task.md
 │   └── walkthrough.md
 ├── src/                    # Zdrojové kódy aplikace
