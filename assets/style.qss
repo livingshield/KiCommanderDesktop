@@ -14,12 +14,22 @@ QWidget#TitleBar {
     background-color: #11111b;
     border-top-left-radius: 10px;
     border-top-right-radius: 10px;
+    border-bottom: 1px solid #313244;
 }
 
 QLabel#TitleLabel {
-    color: #a6adc8;
+    color: #89b4fa;
     font-weight: bold;
+    font-size: 11pt;
     margin-left: 10px;
+    letter-spacing: 1px;
+}
+
+QMenuBar {
+    background-color: #11111b;
+    color: #cdd6f4;
+    border-bottom: 1px solid #313244;
+    padding: 2px;
 }
 
 QWidget {
@@ -110,12 +120,7 @@ QLineEdit:focus {
     border: 1px solid #f5c2e7;
 }
 
-/* Menu Bar */
-QMenuBar {
-    background-color: #11111b;
-    color: #cdd6f4;
-}
-
+/* Menu Bar Items */
 QMenuBar::item:selected {
     background-color: #313244;
 }

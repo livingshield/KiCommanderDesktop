@@ -262,7 +262,11 @@ class CustomTitleBar(QWidget):
         
         # Icon and title
         self.icon_label = QLabel()
-        self.icon_label.setPixmap(qta.icon("fa5s.rocket", color="#89b4fa").pixmap(20, 20))
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "icon.png")
+        if os.path.exists(icon_path):
+            self.icon_label.setPixmap(QPixmap(icon_path).scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            self.icon_label.setPixmap(qta.icon("fa5s.rocket", color="#89b4fa").pixmap(20, 20))
         layout.addWidget(self.icon_label)
         
         self.title_label = QLabel("KiCommander Desktop")
@@ -319,7 +323,11 @@ class KiCommander(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground)
         
         self.setWindowTitle("KiCommander Desktop")
-        self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        else:
+            self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
         self.settings = QSettings("KiCommander", "Desktop")
         
         self.restoreGeometry(self.settings.value("window/geometry", b""))
@@ -535,6 +543,10 @@ if __name__ == "__main__":
             app.setStyle("Fusion")
     
     window = KiCommander()
-    app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
+    icon_path = os.path.join(project_root, "assets", "icon.png")
+    if os.path.exists(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
+    else:
+        app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
     window.show()
     sys.exit(app.exec())
