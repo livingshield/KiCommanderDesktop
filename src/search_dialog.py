@@ -299,7 +299,6 @@ class SearchDialog(QDialog):
             QCalendarWidget QToolButton { color: #cdd6f4; background-color: #313244; }
             QCalendarWidget QAbstractItemView { background-color: #181825; color: #cdd6f4; selection-background-color: #89b4fa; }
         """)
-        layout = QVBoxLayout(self)
 
         # --- Search by name ---
         name_group = QGroupBox("Search by filename")
