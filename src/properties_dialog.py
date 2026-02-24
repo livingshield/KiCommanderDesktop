@@ -14,6 +14,16 @@ class PropertiesDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
+        self.setStyleSheet("""
+            QDialog { background-color: #1e1e2e; }
+            QLabel { color: #cdd6f4; font-size: 10pt; }
+            QPushButton {
+                background-color: #313244; border: 1px solid #45475a;
+                border-radius: 4px; padding: 8px 18px; color: #cdd6f4;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #45475a; border-color: #89b4fa; }
+        """)
         layout = QVBoxLayout(self)
 
         form = QFormLayout()

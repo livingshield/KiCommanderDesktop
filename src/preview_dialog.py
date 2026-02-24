@@ -14,6 +14,16 @@ class PreviewDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
+        self.setStyleSheet("""
+            QDialog { background-color: #1e1e2e; }
+            QLabel { color: #cdd6f4; font-size: 10pt; }
+            QPlainTextEdit {
+                background-color: #181825; color: #cdd6f4;
+                border: 1px solid #313244; border-radius: 4px; padding: 4px;
+                font-family: 'Consolas', 'Courier New', monospace; font-size: 10pt;
+            }
+            QScrollArea { background-color: #181825; border: none; }
+        """)
         layout = QVBoxLayout(self)
         
         # File info header

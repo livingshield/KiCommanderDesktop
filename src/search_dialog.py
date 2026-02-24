@@ -64,6 +64,37 @@ class SearchDialog(QDialog):
         self.setup_ui()
 
     def setup_ui(self):
+        self.setStyleSheet("""
+            QDialog { background-color: #1e1e2e; }
+            QLabel { color: #cdd6f4; font-size: 10pt; }
+            QLineEdit {
+                background-color: #11111b; border: 1px solid #313244;
+                border-radius: 4px; padding: 8px; color: #f5c2e7;
+                font-size: 10pt;
+            }
+            QLineEdit:focus { border: 1px solid #89b4fa; }
+            QPushButton {
+                background-color: #313244; border: 1px solid #45475a;
+                border-radius: 4px; padding: 8px 18px; color: #cdd6f4;
+                font-weight: bold; font-size: 10pt;
+            }
+            QPushButton:hover { background-color: #45475a; border-color: #89b4fa; }
+            QPushButton:disabled { color: #585b70; }
+            QCheckBox { color: #cdd6f4; font-size: 10pt; spacing: 6px; }
+            QTableWidget {
+                background-color: #181825; border: 1px solid #313244;
+                border-radius: 4px; gridline-color: #313244;
+                selection-background-color: rgba(137, 180, 250, 0.2);
+                selection-color: #89b4fa; color: #cdd6f4; font-size: 10pt;
+            }
+            QTableWidget::item { padding: 5px; border-bottom: 1px solid #1e1e2e; }
+            QTableWidget::item:selected { background-color: rgba(137, 180, 250, 0.2); color: #89b4fa; }
+            QHeaderView::section {
+                background-color: #11111b; color: #a6adc8; padding: 8px;
+                border: none; border-right: 1px solid #313244;
+                border-bottom: 2px solid #313244; font-weight: bold;
+            }
+        """)
         layout = QVBoxLayout(self)
 
         # Search input row
