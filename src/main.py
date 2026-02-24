@@ -41,6 +41,7 @@ class FilePanel(QWidget):
         # Path label
         self.path_label = QLabel(self.current_path)
         self.path_label.setObjectName("PathLabel")
+        self.path_label.setToolTip("Current directory path (Double-click or Enter to browse)")
         main_layout.addWidget(self.path_label)
 
         # Body with Sidebar and Table
@@ -82,6 +83,7 @@ class FilePanel(QWidget):
             btn = QPushButton(drive.replace("\\", ""))
             btn.setFixedWidth(40)
             btn.setStyleSheet("padding: 2px; font-size: 9pt;")
+            btn.setToolTip(f"Open drive {drive}")
             btn.clicked.connect(lambda checked, d=drive: self.refresh_path(d))
             self.drive_bar.addWidget(btn)
         self.drive_bar.addStretch()
@@ -186,8 +188,11 @@ class KiCommander(QMainWindow):
 
         # Command Line
         cmd_layout = QHBoxLayout()
-        cmd_layout.addWidget(QLabel("Command:"))
+        cmd_label = QLabel("Command:")
+        cmd_label.setToolTip("Enter system commands to execute in the current path")
+        cmd_layout.addWidget(cmd_label)
         self.cmd_input = QLineEdit()
+        self.cmd_input.setToolTip("Type command and press Enter (e.g., notepad, cmd, or python script)")
         self.cmd_input.returnPressed.connect(self.execute_command)
         cmd_layout.addWidget(self.cmd_input)
         main_layout.addLayout(cmd_layout)
@@ -195,18 +200,19 @@ class KiCommander(QMainWindow):
         # Bottom Buttons
         btn_layout = QHBoxLayout()
         self.btn_configs = [
-            ("F3 View", "eye", self.op_not_implemented),
-            ("F4 Edit", "edit", self.op_not_implemented),
-            ("F5 Copy", "copy", self.op_copy),
-            ("F6 Move", "external-link-alt", self.op_move),
-            ("F7 NewFolder", "folder-plus", self.op_mkdir),
-            ("F8 Delete", "trash-alt", self.op_delete),
-            ("Alt+F4 Exit", "times-circle", self.close)
+            ("F3 View", "eye", self.op_not_implemented, "View file content"),
+            ("F4 Edit", "edit", self.op_not_implemented, "Edit selected file"),
+            ("F5 Copy", "copy", self.op_copy, "Copy selected files to target panel"),
+            ("F6 Move", "external-link-alt", self.op_move, "Move selected files to target panel"),
+            ("F7 NewFolder", "folder-plus", self.op_mkdir, "Create a new directory"),
+            ("F8 Delete", "trash-alt", self.op_delete, "Delete selected files permanently"),
+            ("Alt+F4 Exit", "times-circle", self.close, "Close application")
         ]
         
-        for text, icon_name, callback in self.btn_configs:
+        for text, icon_name, callback, tooltip in self.btn_configs:
             btn = QPushButton(text)
             btn.setIcon(qta.icon(f"fa5s.{icon_name}", color="#cdd6f4"))
+            btn.setToolTip(tooltip)
             btn.clicked.connect(callback)
             btn_layout.addWidget(btn)
         
