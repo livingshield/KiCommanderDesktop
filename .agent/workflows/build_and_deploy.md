@@ -4,28 +4,31 @@ description: Build KiCommander exe and deploy to bin/
 
 // turbo-all
 
-1. Kill any running instance of KiCommander.exe so DLLs are not locked:
+1. Kill any running instance of KiCommander.exe:
 
 ```powershell
 taskkill /F /IM KiCommander.exe 2>$null ; Start-Sleep 1
 ```
 
-// turbo
-2. Run PyInstaller with workpath in build_tmp, output goes directly into project root (--distpath .):
+1. Remove old build artefacts (keep bin/ for now):
 
 ```powershell
-& .\.venv\Scripts\pyinstaller.exe KiCommander.spec --noconfirm --workpath build_tmp --distpath .
+Remove-Item -Recurse -Force dist 2>$null ; Remove-Item -Recurse -Force build_tmp 2>$null
 ```
 
-// turbo
-3. Remove temporary build artefacts:
+1. Run PyInstaller (outputs to dist/KiCommander/):
 
 ```powershell
-Remove-Item -Recurse -Force build_tmp 2>$null
+& .\.venv\Scripts\pyinstaller.exe KiCommander.spec --noconfirm --workpath build_tmp
 ```
 
-// turbo
-4. Commit and push the updated bin/ to GitHub:
+1. Replace bin/ contents with fresh build:
+
+```powershell
+Remove-Item -Recurse -Force bin 2>$null ; Move-Item dist/KiCommander bin ; Remove-Item -Recurse -Force dist 2>$null ; Remove-Item -Recurse -Force build_tmp 2>$null
+```
+
+1. Commit and push:
 
 ```powershell
 git add bin/ ; git commit -m "deploy: update compiled bin/" ; git push
