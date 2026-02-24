@@ -18,11 +18,11 @@ I have completed the foundation of KiCommander Desktop. The application is now f
 
 ## Changes Made
 
-- **main.py:** Complete application logic with UI and event handling.
-- **file_model.py:** Enhanced with icon support and color coding.
-- **file_ops.py:** Dedicated logic for background file operations (copy, move, delete).
-- **style.qss:** Modern CSS-like styling for a premium look.
-- **fs_worker.py:** Threaded directory scanner.
+- **src/main.py:** Complete application logic with UI and event handling.
+- **src/file_model.py:** Enhanced with icon support and color coding.
+- **src/file_ops.py:** Dedicated logic for background file operations (copy, move, delete).
+- **src/style.qss:** Modern CSS-like styling for a premium look.
+- **src/fs_worker.py:** Threaded directory scanner.
 
 ## How to Run
 
@@ -32,10 +32,10 @@ I have completed the foundation of KiCommander Desktop. The application is now f
    pip install PySide6 qtawesome
    ```
 
-2. Run the application:
+2. Run the application from the root:
 
    ```bash
-   python main.py
+   python src/main.py
    ```
 
 ## Next Steps

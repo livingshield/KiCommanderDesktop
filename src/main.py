@@ -252,9 +252,12 @@ class KiCommander(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     
-    # Load stylesheet
-    if os.path.exists("style.qss"):
-        with open("style.qss", "r") as f:
+    # Load stylesheet relative to this script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    style_path = os.path.join(script_dir, "style.qss")
+    
+    if os.path.exists(style_path):
+        with open(style_path, "r") as f:
             app.setStyleSheet(f.read())
     else:
         app.setStyle("Fusion")
