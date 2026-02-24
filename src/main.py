@@ -24,12 +24,14 @@ def get_assets_dir():
 ASSETS_DIR = get_assets_dir()
 
 from file_model import FileModel
-from fs_worker import ScanThread
+from fs_worker import ScanThread, FileInfo
 from file_ops import FileOpThread
 from navigation_utils import get_drives, get_quick_links
 from search_dialog import SearchDialog
 from preview_dialog import PreviewDialog
 from properties_dialog import PropertiesDialog
+from archive_vfs import ArchiveVFS, is_archive
+from plugin_manager import discover_plugins
 
 class FilePanel(QWidget):
     def __init__(self, panel_id, initial_path):
@@ -47,8 +49,12 @@ class FilePanel(QWidget):
         self._watcher.directoryChanged.connect(self._on_dir_changed)
         self._debounce = QTimer(self)
         self._debounce.setSingleShot(True)
-        self._debounce.setInterval(300)  # 300ms debounce
+        self._debounce.setInterval(300)
         self._debounce.timeout.connect(self._do_auto_refresh)
+
+        # Archive VFS state
+        self._archive_vfs = None       # ArchiveVFS instance or None
+        self._archive_inner = ""       # current path inside archive
 
         self.setup_ui()
         self.refresh_path(self.current_path)
@@ -166,21 +172,62 @@ class FilePanel(QWidget):
                 row = self.proxy.mapToSource(index).row()
             file_info = self.model.get_file(row)
             if file_info and file_info.name != "..":
-                menu.addAction(qta.icon("fa5s.folder-open", color="#89b4fa"), "Open", lambda: self.on_double_click(index))
-                menu.addSeparator()
-                menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview (F3)", lambda: self.preview_file(file_info.full_path))
-                menu.addAction(qta.icon("fa5s.edit", color="#f9e2af"), "Rename (F2)", lambda: self.rename_file(file_info))
-                menu.addSeparator()
-                menu.addAction(qta.icon("fa5s.copy", color="#cdd6f4"), "Copy (F5)", lambda: None)
-                menu.addAction(qta.icon("fa5s.external-link-alt", color="#cdd6f4"), "Move (F6)", lambda: None)
-                menu.addAction(qta.icon("fa5s.trash-alt", color="#f38ba8"), "Delete (F8)", lambda: None)
-                menu.addSeparator()
-                menu.addAction(qta.icon("fa5s.info-circle", color="#cba6f7"), "Properties", lambda: self.show_properties(file_info.full_path))
+                # --- Inside archive context menu ---
+                if self._archive_vfs:
+                    if not file_info.is_dir:
+                        menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview", lambda: self._archive_preview(file_info))
+                        menu.addSeparator()
+                    menu.addAction(qta.icon("fa5s.file-export", color="#89b4fa"), "Extract Here",
+                                   lambda: self._extract_here(file_info))
+                    menu.addAction(qta.icon("fa5s.file-export", color="#f9e2af"), "Extract All to...",
+                                   lambda: self._extract_all())
+                else:
+                    # --- Normal filesystem context menu ---
+                    menu.addAction(qta.icon("fa5s.folder-open", color="#89b4fa"), "Open", lambda: self.on_double_click(index))
+                    menu.addSeparator()
+                    if is_archive(file_info.full_path):
+                        menu.addAction(qta.icon("fa5s.file-archive", color="#cba6f7"), "Browse Archive",
+                                       lambda: self._enter_archive(file_info.full_path))
+                        menu.addSeparator()
+                    menu.addAction(qta.icon("fa5s.eye", color="#a6e3a1"), "Preview (F3)", lambda: self.preview_file(file_info.full_path))
+                    menu.addAction(qta.icon("fa5s.edit", color="#f9e2af"), "Rename (F2)", lambda: self.rename_file(file_info))
+                    menu.addSeparator()
+                    menu.addAction(qta.icon("fa5s.copy", color="#cdd6f4"), "Copy (F5)", lambda: None)
+                    menu.addAction(qta.icon("fa5s.external-link-alt", color="#cdd6f4"), "Move (F6)", lambda: None)
+                    menu.addAction(qta.icon("fa5s.trash-alt", color="#f38ba8"), "Delete (F8)", lambda: None)
+                    menu.addSeparator()
+                    menu.addAction(qta.icon("fa5s.info-circle", color="#cba6f7"), "Properties", lambda: self.show_properties(file_info.full_path))
         
-        menu.addSeparator()
-        menu.addAction(qta.icon("fa5s.sync", color="#89b4fa"), "Refresh", lambda: self.refresh_path(self.current_path))
-        menu.addAction(qta.icon("fa5s.folder-plus", color="#a6e3a1"), "New Folder (F7)", lambda: None)
+        if not self._archive_vfs:
+            menu.addSeparator()
+            menu.addAction(qta.icon("fa5s.sync", color="#89b4fa"), "Refresh", lambda: self.refresh_path(self.current_path))
+            menu.addAction(qta.icon("fa5s.folder-plus", color="#a6e3a1"), "New Folder (F7)", lambda: None)
         menu.exec(self.table.viewport().mapToGlobal(pos))
+
+    def _enter_archive(self, path):
+        """Enter archive VFS mode."""
+        self._archive_vfs = ArchiveVFS(path)
+        self._archive_inner = ""
+        self._refresh_archive()
+
+    def _archive_preview(self, file_info):
+        """Extract file from archive to temp and preview."""
+        import tempfile
+        dest = tempfile.mkdtemp(prefix="kicmd_")
+        extracted = self._archive_vfs.extract_file(file_info.full_path, dest)
+        if extracted and os.path.exists(extracted):
+            self.preview_file(extracted)
+
+    def _extract_here(self, file_info):
+        """Extract selected item to current real directory."""
+        self._archive_vfs.extract_file(file_info.full_path, self.current_path)
+
+    def _extract_all(self):
+        """Extract entire archive to a chosen directory."""
+        from PySide6.QtWidgets import QFileDialog
+        dest = QFileDialog.getExistingDirectory(self, "Extract to...", self.current_path)
+        if dest:
+            self._archive_vfs.extract_all(dest)
 
     def preview_file(self, path):
         if os.path.isfile(path):
@@ -246,6 +293,10 @@ class FilePanel(QWidget):
         return super().eventFilter(source, event)
 
     def refresh_path(self, path):
+        # Exit archive mode if entering a real path
+        self._archive_vfs = None
+        self._archive_inner = ""
+
         self.current_path = os.path.abspath(path)
         self.path_label.setText(self.current_path)
         self.settings.setValue(f"panels/{self.panel_id}/path", self.current_path)
@@ -260,6 +311,24 @@ class FilePanel(QWidget):
         self.thread = ScanThread(self.current_path)
         self.thread.worker.finished.connect(self.on_scan_finished)
         self.thread.start()
+
+    def _refresh_archive(self):
+        """List contents of the current archive + inner path."""
+        archive_name = os.path.basename(self._archive_vfs.archive_path)
+        inner = self._archive_inner.strip("/")
+        if inner:
+            self.path_label.setText(f"{archive_name}/{inner}/")
+        else:
+            self.path_label.setText(f"{archive_name}/")
+
+        files = self._archive_vfs.list_dir(self._archive_inner)
+        # Add '..' entry to go back
+        up = FileInfo(name=" .. ", ext="", size="", date="", is_dir=True,
+                      full_path="..")
+        up._size_bytes = 0
+        up._mtime = 0
+        self.model.update_files([up] + files)
+        self.table.selectRow(0)
 
     def on_scan_finished(self, files):
         # Preserve current selection if this is an auto-refresh
@@ -307,13 +376,48 @@ class FilePanel(QWidget):
         if self.filter_visible:
             row = self.proxy.mapToSource(index).row()
         file_info = self.model.get_file(row)
-        if file_info:
-            if file_info.is_dir:
-                if self.filter_visible:
-                    self.toggle_filter()
-                self.refresh_path(file_info.full_path)
+        if not file_info:
+            return
+
+        # --- Inside an archive ---
+        if self._archive_vfs:
+            if file_info.name == " .. ":
+                if self._archive_inner:
+                    # Go up inside archive
+                    parts = self._archive_inner.strip("/").rsplit("/", 1)
+                    self._archive_inner = parts[0] + "/" if len(parts) > 1 else ""
+                    if len(parts) == 1:
+                        self._archive_inner = ""
+                    self._refresh_archive()
+                else:
+                    # Exit archive back to real filesystem
+                    self._archive_vfs = None
+                    self._archive_inner = ""
+                    self.refresh_path(self.current_path)
+            elif file_info.is_dir:
+                self._archive_inner = file_info.full_path
+                self._refresh_archive()
             else:
-                os.startfile(file_info.full_path)
+                # Extract file to temp and open
+                import tempfile
+                dest = tempfile.mkdtemp(prefix="kicmd_")
+                extracted = self._archive_vfs.extract_file(file_info.full_path, dest)
+                if extracted and os.path.exists(extracted):
+                    os.startfile(extracted)
+            return
+
+        # --- Real filesystem ---
+        if file_info.is_dir:
+            if self.filter_visible:
+                self.toggle_filter()
+            self.refresh_path(file_info.full_path)
+        elif is_archive(file_info.full_path):
+            # Enter archive
+            self._archive_vfs = ArchiveVFS(file_info.full_path)
+            self._archive_inner = ""
+            self._refresh_archive()
+        else:
+            os.startfile(file_info.full_path)
 
     def get_selected_paths(self):
         indices = self.table.selectionModel().selectedRows()
@@ -431,7 +535,22 @@ class KiCommander(QMainWindow):
         cmd_menu.addAction("Refresh", self.refresh_all, "Ctrl+R")
         cmd_menu.addAction("Search", self.op_search, "Alt+F7")
         cmd_menu.addAction("Filter", self.op_filter, "Ctrl+F")
-        
+
+        # Load plugins
+        if getattr(sys, '_MEIPASS', None):
+            plugins_dir = os.path.join(sys._MEIPASS, "plugins")
+        else:
+            plugins_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "plugins")
+        self._plugins = discover_plugins(plugins_dir)
+        if self._plugins:
+            cmd_menu.addSeparator()
+            for plugin in self._plugins:
+                cmd_menu.addAction(
+                    qta.icon("fa5s.puzzle-piece", color="#cba6f7"),
+                    plugin.menu_text,
+                    lambda p=plugin: self._run_plugin(p)
+                )
+
         # Enable dragging through the menubar
         menubar.installEventFilter(self)
 
@@ -565,6 +684,15 @@ class KiCommander(QMainWindow):
     def op_filter(self):
         active = self.get_active_panel()
         active.toggle_filter()
+
+    def _run_plugin(self, plugin):
+        """Execute a plugin with the selected files from the active panel."""
+        active = self.get_active_panel()
+        selected = active.get_selected_paths()
+        try:
+            plugin.action(selected, active)
+        except Exception as e:
+            QMessageBox.warning(self, "Plugin Error", f"{plugin.name} failed:\n{e}")
 
     def op_mkdir(self):
         active = self.get_active_panel()
