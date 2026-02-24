@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QLabel, QPushButton, QStatusBar, QLineEdit, QMessageBox,
                              QInputDialog, QMenu)
 from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent, QSortFilterProxyModel
-from PySide6.QtGui import QAction, QIcon
+from PySide6.QtGui import QAction, QIcon, QPixmap
 import qtawesome as qta
 
 from file_model import FileModel
