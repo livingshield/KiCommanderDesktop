@@ -1,9 +1,10 @@
 import os
+import time
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, 
                              QPushButton, QLabel, QTableWidget, QTableWidgetItem,
                              QComboBox, QCheckBox, QProgressBar, QHeaderView,
-                             QGroupBox, QFileDialog)
-from PySide6.QtCore import Qt, QThread, Signal, QObject
+                             QGroupBox, QFileDialog, QSpinBox, QDateEdit)
+from PySide6.QtCore import Qt, QThread, Signal, QObject, QDate
 import qtawesome as qta
 
 TEXT_EXTENSIONS = {
@@ -20,13 +21,18 @@ class SearchWorker(QObject):
     progress = Signal(str)
 
     def __init__(self, root_path, name_pattern, content_pattern="",
-                 case_sensitive=False, search_subdirs=True):
+                 case_sensitive=False, search_subdirs=True,
+                 min_size=0, max_size=0, min_date=0, max_date=0):
         super().__init__()
         self.root_path = root_path
         self.name_pattern = name_pattern
         self.content_pattern = content_pattern
         self.case_sensitive = case_sensitive
         self.search_subdirs = search_subdirs
+        self.min_size = min_size    # bytes, 0 = no limit
+        self.max_size = max_size    # bytes, 0 = no limit
+        self.min_date = min_date    # epoch, 0 = no limit
+        self.max_date = max_date    # epoch, 0 = no limit
         self._cancelled = False
 
     def cancel(self):
@@ -66,6 +72,22 @@ class SearchWorker(QObject):
             pass
         return ""
 
+    def _check_size_date(self, filepath):
+        """Check file against size and date filters. Returns True if passes."""
+        try:
+            st = os.stat(filepath)
+            if self.min_size and st.st_size < self.min_size:
+                return False
+            if self.max_size and st.st_size > self.max_size:
+                return False
+            if self.min_date and st.st_mtime < self.min_date:
+                return False
+            if self.max_date and st.st_mtime > self.max_date:
+                return False
+        except OSError:
+            return False
+        return True
+
     def run(self):
         count = 0
         for dirpath, dirnames, filenames in os.walk(self.root_path):
@@ -80,23 +102,28 @@ class SearchWorker(QObject):
                 full = os.path.join(dirpath, fname)
                 name_ok = self._match_name(fname)
                 
+                if not name_ok:
+                    continue
+                
+                # Apply size/date filters
+                if (self.min_size or self.max_size or self.min_date or self.max_date):
+                    if not self._check_size_date(full):
+                        continue
+                
                 # Content search mode
                 if self.content_pattern:
-                    if name_ok:
-                        match_line = self._search_content(full)
-                        if match_line:
-                            size_str = self._get_size(full)
-                            self.found.emit(fname, dirpath, size_str, match_line)
-                            count += 1
-                else:
-                    # Name-only search
-                    if name_ok:
+                    match_line = self._search_content(full)
+                    if match_line:
                         size_str = self._get_size(full)
-                        self.found.emit(fname, dirpath, size_str, "")
+                        self.found.emit(fname, dirpath, size_str, match_line)
                         count += 1
+                else:
+                    size_str = self._get_size(full)
+                    self.found.emit(fname, dirpath, size_str, "")
+                    count += 1
 
             if not self.search_subdirs:
-                break  # Only scan the top-level directory
+                break
 
         self.finished.emit(count)
 
@@ -250,6 +277,57 @@ class SearchDialog(QDialog):
         checks_layout.addStretch()
         layout.addLayout(checks_layout)
 
+        # --- Filters (Size & Date) ---
+        filter_group = QGroupBox("Filters (optional)")
+        filter_layout = QVBoxLayout(filter_group)
+
+        # Size filter row
+        size_row = QHBoxLayout()
+        size_row.addWidget(QLabel("Size:"))
+        self.min_size_spin = QSpinBox()
+        self.min_size_spin.setRange(0, 999999)
+        self.min_size_spin.setSpecialValueText("No min")
+        self.min_size_spin.setToolTip("Minimum file size")
+        size_row.addWidget(self.min_size_spin)
+        self.min_size_unit = QComboBox()
+        self.min_size_unit.addItems(["KB", "MB", "GB"])
+        size_row.addWidget(self.min_size_unit)
+        size_row.addWidget(QLabel(" – "))
+        self.max_size_spin = QSpinBox()
+        self.max_size_spin.setRange(0, 999999)
+        self.max_size_spin.setSpecialValueText("No max")
+        self.max_size_spin.setToolTip("Maximum file size")
+        size_row.addWidget(self.max_size_spin)
+        self.max_size_unit = QComboBox()
+        self.max_size_unit.addItems(["KB", "MB", "GB"])
+        size_row.addWidget(self.max_size_unit)
+        size_row.addStretch()
+        filter_layout.addLayout(size_row)
+
+        # Date filter row
+        date_row = QHBoxLayout()
+        date_row.addWidget(QLabel("Modified:"))
+        self.date_from_check = QCheckBox("From:")
+        date_row.addWidget(self.date_from_check)
+        self.date_from = QDateEdit()
+        self.date_from.setCalendarPopup(True)
+        self.date_from.setDate(QDate.currentDate().addMonths(-1))
+        self.date_from.setEnabled(False)
+        self.date_from_check.toggled.connect(self.date_from.setEnabled)
+        date_row.addWidget(self.date_from)
+        self.date_to_check = QCheckBox("To:")
+        date_row.addWidget(self.date_to_check)
+        self.date_to = QDateEdit()
+        self.date_to.setCalendarPopup(True)
+        self.date_to.setDate(QDate.currentDate())
+        self.date_to.setEnabled(False)
+        self.date_to_check.toggled.connect(self.date_to.setEnabled)
+        date_row.addWidget(self.date_to)
+        date_row.addStretch()
+        filter_layout.addLayout(date_row)
+
+        layout.addWidget(filter_group)
+
         # --- Buttons ---
         btn_layout = QHBoxLayout()
         self.search_btn = QPushButton("  Search")
@@ -297,6 +375,14 @@ class SearchDialog(QDialog):
         if directory:
             self.path_input.setText(directory)
 
+    def _size_to_bytes(self, value, unit_combo):
+        """Convert spin value + unit combo to bytes."""
+        if value == 0:
+            return 0
+        unit = unit_combo.currentText()
+        mult = {"KB": 1024, "MB": 1024**2, "GB": 1024**3}
+        return value * mult.get(unit, 1024)
+
     def start_search(self):
         name_pattern = self.search_input.text().strip()
         content_pattern = self.content_input.text().strip()
@@ -308,6 +394,21 @@ class SearchDialog(QDialog):
         if not os.path.isdir(root):
             return
 
+        # Compute size filters
+        min_size = self._size_to_bytes(self.min_size_spin.value(), self.min_size_unit)
+        max_size = self._size_to_bytes(self.max_size_spin.value(), self.max_size_unit)
+
+        # Compute date filters (epoch timestamps)
+        min_date = 0
+        max_date = 0
+        if self.date_from_check.isChecked():
+            d = self.date_from.date()
+            min_date = time.mktime(time.strptime(d.toString("yyyy-MM-dd"), "%Y-%m-%d"))
+        if self.date_to_check.isChecked():
+            d = self.date_to.date()
+            # End of day
+            max_date = time.mktime(time.strptime(d.toString("yyyy-MM-dd"), "%Y-%m-%d")) + 86399
+
         self.results_table.setRowCount(0)
         self.search_btn.setEnabled(False)
         self.cancel_btn.setEnabled(True)
@@ -317,7 +418,9 @@ class SearchDialog(QDialog):
         self.worker = SearchWorker(
             root, name_pattern, content_pattern,
             case_sensitive=self.case_check.isChecked(),
-            search_subdirs=self.subdirs_check.isChecked()
+            search_subdirs=self.subdirs_check.isChecked(),
+            min_size=min_size, max_size=max_size,
+            min_date=min_date, max_date=max_date
         )
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
