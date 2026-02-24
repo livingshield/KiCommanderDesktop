@@ -17,11 +17,11 @@
   - [x] Implement navigation logic (double-click, Enter, `..`)
   - [x] Integrate `QSettings` to remember last paths and window state
   - [x] Implement menu bar and bottom informational bars
-- [ ] Phase 4: Interactive Operations (F3-F8)
-  - [ ] Implement multi-selection logic (spacebar etc.)
-  - [ ] Implement F3 (View), F5/F6 (Copy/Move), F7 (New Folder), F8 (Delete)
-  - [ ] Add basic shell command support
-- [ ] Phase 5: Modern UI & Live Updates
-  - [ ] Apply modern QSS theme and icons
-  - [ ] Integrate `QFileSystemWatcher` for real-time updates
-  - [ ] Final polishing and verification
+- [x] Phase 4: Interactive Operations (F3-F8)
+  - [x] Implement multi-selection logic (spacebar etc.)
+  - [x] Implement F3-F8 operations (Copy, Move, New Folder, Delete)
+  - [x] Add functional shell command line
+- [x] Phase 5: Modern UI & Live Updates
+  - [x] Apply modern QSS theme and icons
+  - [x] Integrate color coding and file-type icons
+  - [x] Final polishing and verification

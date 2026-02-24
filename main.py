@@ -31,7 +31,7 @@ class FilePanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
 
         self.path_label = QLabel(self.current_path)
-        self.path_label.setStyleSheet("font-weight: bold; padding: 5px; background: #333; color: white;")
+        self.path_label.setObjectName("PathLabel")
         layout.addWidget(self.path_label)
 
         self.table = QTableView()
@@ -143,17 +143,18 @@ class KiCommander(QMainWindow):
         # Bottom Buttons
         btn_layout = QHBoxLayout()
         self.btn_configs = [
-            ("F3 View", self.op_not_implemented),
-            ("F4 Edit", self.op_not_implemented),
-            ("F5 Copy", self.op_copy),
-            ("F6 Move", self.op_move),
-            ("F7 NewFolder", self.op_mkdir),
-            ("F8 Delete", self.op_delete),
-            ("Alt+F4 Exit", self.close)
+            ("F3 View", "eye", self.op_not_implemented),
+            ("F4 Edit", "edit", self.op_not_implemented),
+            ("F5 Copy", "copy", self.op_copy),
+            ("F6 Move", "external-link-alt", self.op_move),
+            ("F7 NewFolder", "folder-plus", self.op_mkdir),
+            ("F8 Delete", "trash-alt", self.op_delete),
+            ("Alt+F4 Exit", "times-circle", self.close)
         ]
         
-        for text, callback in self.btn_configs:
+        for text, icon_name, callback in self.btn_configs:
             btn = QPushButton(text)
+            btn.setIcon(qta.icon(f"fa5s.{icon_name}", color="#cdd6f4"))
             btn.clicked.connect(callback)
             btn_layout.addWidget(btn)
         
@@ -250,7 +251,14 @@ class KiCommander(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    app.setStyle("Fusion")
+    
+    # Load stylesheet
+    if os.path.exists("style.qss"):
+        with open("style.qss", "r") as f:
+            app.setStyleSheet(f.read())
+    else:
+        app.setStyle("Fusion")
+    
     window = KiCommander()
     window.show()
     sys.exit(app.exec())

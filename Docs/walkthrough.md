@@ -5,20 +5,24 @@ I have completed the foundation of KiCommander Desktop. The application is now f
 ## Key Features Implemented
 
 - **Double-Panel Layout:** Two independent file browsers allowing simultaneous view of different directories.
-- **Asynchronous I/O:** File system scanning is performed in a background thread (`QThread`), ensuring the UI stays responsive even with large directories.
-- **MVC Architecture:** A custom `FileModel` based on `QAbstractTableModel` handles data separation from the UI.
-- **Navigation:** Navigation via double-click or **Enter key** is fully functional, including the `[..]` parent directory entry.
-- **Panel Switching:** Use the **Tab key** to quickly switch focus between the left and right panels.
-- **State Persistence:** The application now remembers your last visited directories, window size, and position using `QSettings`.
-- **Menu Bar:** Added functional Menu Bar with "Files" and "Commands" (Exit, Search placeholders).
-- **Configuration:** Integrated `ConfigManager` for secure API key handling.
+- **Asynchronous I/O:** File system scanning is performed in a background thread (`QThread`), ensuring the UI stays responsive.
+- **MVC Architecture:** A custom `FileModel` based on `QAbstractTableModel` handles data separation.
+- **Navigation:** Navigation via double-click or **Enter key** is fully functional.
+- **Selection:** Multi-selection supported via **Spacebar** (Total Commander style).
+- **File Operations:** Fully functional **F5 (Copy)**, **F6 (Move)**, **F7 (New Folder)**, and **F8 (Delete)**.
+- **Command Line:** Integrated command bar for executing system commands in the current directory.
+- **Modern UI:** Premium dark theme with **Catppuccin-inspired** colors and high-quality **FontAwesome** icons.
+- **File Icons:** Specific icons for folders, archives, executables, and images with color coding.
+- **State Persistence:** Remembers directories, window size, and position via `QSettings`.
+- **Configuration:** Secure API key management with Git protection.
 
 ## Changes Made
 
-- **main.py:** Updated with `QSettings`, `eventFilter` for Enter key, and `keyPressEvent` for Tab navigation.
-- **file_model.py:** Refined for better Qt compatibility.
-- **config_manager.py:** Added to manage application secrets.
-- **Docs/:** Moved all planning and task files to the `Docs/` directory.
+- **main.py:** Complete application logic with UI and event handling.
+- **file_model.py:** Enhanced with icon support and color coding.
+- **file_ops.py:** Dedicated logic for background file operations (copy, move, delete).
+- **style.qss:** Modern CSS-like styling for a premium look.
+- **fs_worker.py:** Threaded directory scanner.
 
 ## How to Run
 
