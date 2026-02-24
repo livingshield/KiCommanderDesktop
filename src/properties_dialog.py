@@ -2,7 +2,7 @@ import os
 import time
 import stat as stat_module
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QFormLayout, QPushButton)
+                             QFormLayout, QPushButton, QWidget)
 from PySide6.QtCore import Qt, QThread, Signal, QObject
 import qtawesome as qta
 
@@ -37,14 +37,69 @@ class PropertiesDialog(QDialog):
     def __init__(self, file_path, parent=None):
         super().__init__(parent)
         self.file_path = file_path
-        self.setWindowTitle(f"Properties - {os.path.basename(file_path)}")
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.setMinimumWidth(450)
+        self._drag_pos = None
         self.setup_ui()
-        self.setWindowIcon(qta.icon("fa5s.info-circle", color="#89b4fa"))
 
     def setup_ui(self):
+        # Outer wrapper
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        container = QWidget()
+        container.setObjectName("DialogContainer")
+        outer.addWidget(container)
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Custom title bar
+        title_bar = QWidget()
+        title_bar.setFixedHeight(38)
+        title_bar.setObjectName("DialogTitleBar")
+        tb_layout = QHBoxLayout(title_bar)
+        tb_layout.setContentsMargins(12, 0, 6, 0)
+        tb_layout.setSpacing(8)
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(qta.icon("fa5s.info-circle", color="#89b4fa").pixmap(16, 16))
+        tb_layout.addWidget(icon_lbl)
+        title_lbl = QLabel(f"Properties – {os.path.basename(self.file_path)}")
+        title_lbl.setStyleSheet("color: #cdd6f4; font-weight: bold; font-size: 10pt;")
+        tb_layout.addWidget(title_lbl)
+        tb_layout.addStretch()
+        close_btn = QPushButton()
+        close_btn.setIcon(qta.icon("fa5s.times", color="#cdd6f4"))
+        close_btn.setFixedSize(28, 28)
+        close_btn.setObjectName("TitleCloseBtn")
+        close_btn.clicked.connect(self.accept)
+        tb_layout.addWidget(close_btn)
+        main_layout.addWidget(title_bar)
+
+        # Content area
+        content = QWidget()
+        content.setObjectName("DialogContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(16, 12, 16, 16)
+        main_layout.addWidget(content, 1)
+
         self.setStyleSheet("""
-            QDialog { background-color: #1e1e2e; }
+            #DialogContainer {
+                background-color: #1e1e2e;
+                border: 1px solid #313244;
+                border-radius: 8px;
+            }
+            #DialogTitleBar {
+                background-color: #11111b;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                border-bottom: 1px solid #313244;
+            }
+            #TitleCloseBtn {
+                background: transparent; border: none; border-radius: 14px;
+            }
+            #TitleCloseBtn:hover { background-color: #f38ba8; }
+            #DialogContent { background-color: #1e1e2e; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
             QLabel { color: #cdd6f4; font-size: 10pt; }
             QLabel#ValueLabel { color: #bac2de; }
             QLabel#HeaderLabel { color: #89b4fa; font-weight: bold; font-size: 11pt; }
@@ -55,7 +110,6 @@ class PropertiesDialog(QDialog):
             }
             QPushButton:hover { background-color: #45475a; border-color: #89b4fa; }
         """)
-        layout = QVBoxLayout(self)
 
         # Header with icon
         header = QHBoxLayout()
@@ -99,7 +153,6 @@ class PropertiesDialog(QDialog):
             st = os.stat(self.file_path)
 
             if is_dir:
-                # Show placeholder, start background calculation
                 self.size_label = self._val("Calculating...")
                 self.contains_label = self._val("Calculating...")
                 form.addRow("Total Size:", self.size_label)
@@ -109,7 +162,6 @@ class PropertiesDialog(QDialog):
                 size_str = f"{self._format_size(st.st_size)}  ({st.st_size:,} bytes)"
                 form.addRow("Size:", self._val(size_str))
 
-            # Timestamps
             form.addRow("Created:", self._val(
                 time.strftime("%d.%m.%Y  %H:%M:%S", time.localtime(st.st_ctime))))
             form.addRow("Modified:", self._val(
@@ -117,14 +169,12 @@ class PropertiesDialog(QDialog):
             form.addRow("Accessed:", self._val(
                 time.strftime("%d.%m.%Y  %H:%M:%S", time.localtime(st.st_atime))))
 
-            # Permissions
             attrs = []
             if os.access(self.file_path, os.R_OK): attrs.append("Read")
             if os.access(self.file_path, os.W_OK): attrs.append("Write")
             if os.access(self.file_path, os.X_OK): attrs.append("Execute")
             form.addRow("Permissions:", self._val(", ".join(attrs) if attrs else "None"))
 
-            # Windows-specific attributes
             if hasattr(st, 'st_file_attributes'):
                 win_attrs = []
                 fa = st.st_file_attributes
@@ -147,21 +197,19 @@ class PropertiesDialog(QDialog):
         # Close button
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
-        close_btn = QPushButton("  Close")
-        close_btn.setIcon(qta.icon("fa5s.times", color="#cdd6f4"))
-        close_btn.clicked.connect(self.accept)
-        btn_layout.addWidget(close_btn)
+        close_btn2 = QPushButton("  Close")
+        close_btn2.setIcon(qta.icon("fa5s.times", color="#cdd6f4"))
+        close_btn2.clicked.connect(self.accept)
+        btn_layout.addWidget(close_btn2)
         layout.addLayout(btn_layout)
 
     def _val(self, text):
-        """Create a styled value label."""
         label = QLabel(str(text))
         label.setObjectName("ValueLabel")
         label.setTextInteractionFlags(Qt.TextSelectableByMouse)
         return label
 
     def _start_dir_size(self):
-        """Start background directory size calculation."""
         self._thread = QThread(self)
         self._worker = DirSizeWorker(self.file_path)
         self._worker.moveToThread(self._thread)
@@ -173,6 +221,19 @@ class PropertiesDialog(QDialog):
     def _on_dir_size_done(self, total, files, dirs):
         self.size_label.setText(f"{self._format_size(total)}  ({total:,} bytes)")
         self.contains_label.setText(f"{files:,} files, {dirs:,} folders")
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.position().y() < 38:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
 
     @staticmethod
     def _format_size(size):

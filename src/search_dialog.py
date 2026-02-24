@@ -3,7 +3,7 @@ import time
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, 
                              QPushButton, QLabel, QTableWidget, QTableWidgetItem,
                              QComboBox, QCheckBox, QProgressBar, QHeaderView,
-                             QGroupBox, QFileDialog, QSpinBox, QDateEdit)
+                             QGroupBox, QFileDialog, QSpinBox, QDateEdit, QWidget)
 from PySide6.QtCore import Qt, QThread, Signal, QObject, QDate
 import qtawesome as qta
 
@@ -147,17 +147,72 @@ class SearchDialog(QDialog):
 
     def __init__(self, start_path, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Search Files (Alt+F7)")
-        self.setMinimumSize(750, 550)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setMinimumSize(750, 580)
         self.start_path = start_path
         self.thread = None
         self.worker = None
+        self._drag_pos = None
         self.setup_ui()
-        self.setWindowIcon(qta.icon("fa5s.search", color="#89b4fa"))
 
     def setup_ui(self):
+        # Outer wrapper for rounded corners
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        container = QWidget()
+        container.setObjectName("DialogContainer")
+        outer.addWidget(container)
+        main_layout = QVBoxLayout(container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Custom title bar
+        title_bar = QWidget()
+        title_bar.setFixedHeight(38)
+        title_bar.setObjectName("DialogTitleBar")
+        tb_layout = QHBoxLayout(title_bar)
+        tb_layout.setContentsMargins(12, 0, 6, 0)
+        tb_layout.setSpacing(8)
+        icon_lbl = QLabel()
+        icon_lbl.setPixmap(qta.icon("fa5s.search", color="#89b4fa").pixmap(16, 16))
+        tb_layout.addWidget(icon_lbl)
+        title_lbl = QLabel("Search Files")
+        title_lbl.setStyleSheet("color: #cdd6f4; font-weight: bold; font-size: 10pt;")
+        tb_layout.addWidget(title_lbl)
+        tb_layout.addStretch()
+        close_btn = QPushButton()
+        close_btn.setIcon(qta.icon("fa5s.times", color="#cdd6f4"))
+        close_btn.setFixedSize(28, 28)
+        close_btn.setObjectName("TitleCloseBtn")
+        close_btn.clicked.connect(self.reject)
+        tb_layout.addWidget(close_btn)
+        main_layout.addWidget(title_bar)
+
+        # Content area
+        content = QWidget()
+        content.setObjectName("DialogContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(12, 8, 12, 12)
+        main_layout.addWidget(content, 1)
+
         self.setStyleSheet("""
-            QDialog { background-color: #1e1e2e; }
+            #DialogContainer {
+                background-color: #1e1e2e;
+                border: 1px solid #313244;
+                border-radius: 8px;
+            }
+            #DialogTitleBar {
+                background-color: #11111b;
+                border-top-left-radius: 8px;
+                border-top-right-radius: 8px;
+                border-bottom: 1px solid #313244;
+            }
+            #TitleCloseBtn {
+                background: transparent; border: none; border-radius: 14px;
+            }
+            #TitleCloseBtn:hover { background-color: #f38ba8; }
+            #DialogContent { background-color: #1e1e2e; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
             QLabel { color: #cdd6f4; font-size: 10pt; }
             QLabel#HelpLabel { color: #6c7086; font-size: 9pt; font-style: italic; }
             QLineEdit {
@@ -496,3 +551,16 @@ class SearchDialog(QDialog):
         path = self.results_table.item(row, 1).text()
         self.navigate_to.emit(path)
         self.accept()
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton and event.position().y() < 38:
+            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            event.accept()
+
+    def mouseMoveEvent(self, event):
+        if self._drag_pos and event.buttons() & Qt.LeftButton:
+            self.move(event.globalPosition().toPoint() - self._drag_pos)
+            event.accept()
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
