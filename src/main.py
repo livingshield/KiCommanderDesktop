@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PySide6.QtCore import Qt, QSettings, QPoint, QSize, QEvent, QSortFilterProxyModel
 from PySide6.QtGui import QAction, QIcon, QPixmap
 import qtawesome as qta
+import ctypes
 
 from file_model import FileModel
 from fs_worker import ScanThread
@@ -262,11 +263,13 @@ class CustomTitleBar(QWidget):
         
         # Icon and title
         self.icon_label = QLabel()
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "icon.png")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        assets_dir = os.path.abspath(os.path.join(base_dir, "..", "assets"))
+        icon_path = os.path.join(assets_dir, "icon.png")
         if os.path.exists(icon_path):
-            self.icon_label.setPixmap(QPixmap(icon_path).scaled(20, 20, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+            self.icon_label.setPixmap(QPixmap(icon_path).scaled(22, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation))
         else:
-            self.icon_label.setPixmap(qta.icon("fa5s.rocket", color="#89b4fa").pixmap(20, 20))
+            self.icon_label.setPixmap(qta.icon("fa5s.rocket", color="#89b4fa").pixmap(22, 22))
         layout.addWidget(self.icon_label)
         
         self.title_label = QLabel("KiCommander Desktop")
@@ -327,11 +330,17 @@ class KiCommander(QMainWindow):
         self.setAttribute(Qt.WA_TranslucentBackground)
         
         self.setWindowTitle("KiCommander Desktop")
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "assets", "icon.png")
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        assets_dir = os.path.abspath(os.path.join(base_dir, "..", "assets"))
+        icon_path = os.path.join(assets_dir, "icon.ico")
         if os.path.exists(icon_path):
             self.setWindowIcon(QIcon(icon_path))
         else:
-            self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
+            icon_path = os.path.join(assets_dir, "icon.png")
+            if os.path.exists(icon_path):
+                self.setWindowIcon(QIcon(icon_path))
+            else:
+                self.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
         self.settings = QSettings("KiCommander", "Desktop")
         self.drag_pos = None
         
@@ -543,12 +552,20 @@ class KiCommander(QMainWindow):
         super().closeEvent(event)
 
 if __name__ == "__main__":
+    # Force Taskbar Icon on Windows
+    try:
+        myappid = 'KiCommander.Desktop.v1'
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(myappid)
+    except Exception:
+        pass
+
     app = QApplication(sys.argv)
     
     # Load stylesheet from assets
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
-    style_path = os.path.join(project_root, "assets", "style.qss")
+    assets_dir = os.path.join(project_root, "assets")
+    style_path = os.path.join(assets_dir, "style.qss")
     
     if os.path.exists(style_path):
         with open(style_path, "r") as f:
@@ -563,10 +580,18 @@ if __name__ == "__main__":
             app.setStyle("Fusion")
     
     window = KiCommander()
-    icon_path = os.path.join(project_root, "assets", "icon.png")
+    
+    # Set App Icon robustly
+    icon_path = os.path.join(assets_dir, "icon.ico")
     if os.path.exists(icon_path):
         app.setWindowIcon(QIcon(icon_path))
     else:
-        app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
+        # Fallback to PNG
+        icon_path = os.path.join(assets_dir, "icon.png")
+        if os.path.exists(icon_path):
+            app.setWindowIcon(QIcon(icon_path))
+        else:
+            app.setWindowIcon(qta.icon("fa5s.rocket", color="#89b4fa"))
+            
     window.show()
     sys.exit(app.exec())
