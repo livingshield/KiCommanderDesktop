@@ -424,13 +424,13 @@ class KiCommander(QMainWindow):
 
     def setup_ui(self):
         menubar = self.menuBar()
-        file_menu = menubar.addMenu("&Files")
+        file_menu = menubar.addMenu("Files")
         file_menu.addAction("Exit", self.close, "Alt+F4")
         
-        cmd_menu = menubar.addMenu("&Commands")
+        cmd_menu = menubar.addMenu("Commands")
         cmd_menu.addAction("Refresh", self.refresh_all, "Ctrl+R")
-        cmd_menu.addAction("Search (Alt+F7)", self.op_search, "Alt+F7")
-        cmd_menu.addAction("Filter (Ctrl+F)", self.op_filter, "Ctrl+F")
+        cmd_menu.addAction("Search", self.op_search, "Alt+F7")
+        cmd_menu.addAction("Filter", self.op_filter, "Ctrl+F")
         
         # Enable dragging through the menubar
         menubar.installEventFilter(self)
