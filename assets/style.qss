@@ -70,6 +70,16 @@ QHeaderView::section {
     font-weight: bold;
 }
 
+QHeaderView::section:hover {
+    background-color: #1e1e2e;
+    color: #89b4fa;
+    cursor: pointer;
+}
+
+QHeaderView::section:pressed {
+    background-color: #313244;
+}
+
 /* Path Labels */
 QLabel#PathLabel {
     background-color: #313244;

@@ -90,6 +90,12 @@ class FilePanel(QWidget):
         self.table.customContextMenuRequested.connect(self.show_context_menu)
         self.table.installEventFilter(self)
         
+        # --- Sorting via header clicks ---
+        header = self.table.horizontalHeader()
+        header.setSectionsClickable(True)
+        header.sectionClicked.connect(self._on_header_clicked)
+        header.setCursor(Qt.PointingHandCursor)
+        
         body_layout.addWidget(self.table, 1)
         main_layout.addLayout(body_layout, 1)
 
@@ -238,8 +244,19 @@ class FilePanel(QWidget):
 
     def on_scan_finished(self, files):
         self.model.update_files(files)
+        # Refresh header to redraw sort arrows
+        self.table.horizontalHeader().viewport().update()
         self.table.selectRow(0)
         self.table.setFocus()
+
+    def _on_header_clicked(self, col: int):
+        """Toggle asc/desc on same column, switch to asc on new column."""
+        if self.model._sort_col == col:
+            order = Qt.DescendingOrder if self.model._sort_asc else Qt.AscendingOrder
+        else:
+            order = Qt.AscendingOrder
+        self.model.sort(col, order)
+        self.table.horizontalHeader().viewport().update()
 
     def on_double_click(self, index):
         row = index.row()
