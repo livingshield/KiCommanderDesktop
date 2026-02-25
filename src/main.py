@@ -4,7 +4,7 @@ from collections import deque
 import subprocess
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QMenuBar, QLabel, QStatusBar, QLineEdit, 
-                             QMessageBox, QMenu, QTabWidget)
+                             QMessageBox, QMenu, QTabWidget, QPushButton)
 from PySide6.QtCore import Qt, QSettings, QEvent
 from PySide6.QtGui import QAction, QIcon
 import qtawesome as qta
@@ -151,7 +151,9 @@ class KiCommander(QMainWindow):
 
         # Command Line
         cmd_layout = QHBoxLayout()
+        cmd_layout.setContentsMargins(5, 0, 5, 0)
         cmd_label = QLabel("Command:")
+        cmd_label.setObjectName("CommandLabel")
         cmd_label.setToolTip("Enter system commands to execute in the current path")
         cmd_layout.addWidget(cmd_label)
         self.cmd_input = QLineEdit()
@@ -162,6 +164,7 @@ class KiCommander(QMainWindow):
 
         # Bottom Buttons
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(2)
         self.btn_configs = [
             ("F3 View", "eye", self.actions.op_view, "Preview file content (text, image, hex)"),
             ("F4 Edit", "edit", self.actions.op_edit, "Open file in default editor"),
@@ -177,21 +180,22 @@ class KiCommander(QMainWindow):
             btn.setIcon(qta.icon(f"fa5s.{icon_name}", color="#cdd6f4"))
             btn.setToolTip(tooltip)
             btn.clicked.connect(callback)
+            btn.setMinimumHeight(35)
             btn_layout.addWidget(btn)
         
         content_layout.addLayout(btn_layout)
 
         # Status Bar
         self.sb = QStatusBar()
+        self.sb.setObjectName("MainStatusBar")
+        self.sb.setFixedHeight(25)
         content_layout.addWidget(self.sb)
         self.sb.showMessage("Ready")
 
-        # --- Transfer Manager Dock ---
-        from PySide6.QtWidgets import QDockWidget
-        self.transfer_dock = QDockWidget("Transfer Manager", self)
+        # --- Transfer Manager (Integrated) ---
         self.transfer_widget = TransferManagerWidget(self)
-        self.transfer_dock.setWidget(self.transfer_widget)
-        self.addDockWidget(Qt.BottomDockWidgetArea, self.transfer_dock)
+        self.transfer_widget.setVisible(False) # Hidden by default
+        content_layout.addWidget(self.transfer_widget)
         
         # The QueueManager signal is now handled by ActionManager
         # self.actions.on_queue_overwrite is already connected in ActionManager.__init__
@@ -208,27 +212,65 @@ class KiCommander(QMainWindow):
         else:
             return self.left_tabs.currentWidget()
 
+    def eventFilter(self, source, event):
+        # Allow dragging window by menubar
+        if source is self.menuBar():
+            if event.type() == QEvent.MouseButtonPress:
+                if event.button() == Qt.LeftButton:
+                    self.drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                    self._dragging = False
+                    return False
+            elif event.type() == QEvent.MouseMove:
+                if event.buttons() == Qt.LeftButton and self.drag_pos:
+                    delta = event.globalPosition().toPoint() - (self.drag_pos + self.frameGeometry().topLeft())
+                    if not self._dragging and delta.manhattanLength() > 5:
+                        self._dragging = True
+                    if self._dragging:
+                        self.move(event.globalPosition().toPoint() - self.drag_pos)
+                        return True
+            elif event.type() == QEvent.MouseButtonRelease:
+                self.drag_pos = None
+                self._dragging = False
+        
+        # Track focus for panels (Dynamické zjišťování přes Tabs)
+        if event.type() == QEvent.FocusIn:
+            left_active = self.left_tabs.currentWidget()
+            right_active = self.right_tabs.currentWidget()
+            
+            if left_active and hasattr(left_active, 'table') and source is left_active.table:
+                self._last_active_panel = left_active
+            elif right_active and hasattr(right_active, 'table') and source is right_active.table:
+                self._last_active_panel = right_active
+
+        return super().eventFilter(source, event)
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        
+        # Obsluha přepínání panelů pomocí klávesy Tab
+        if key == Qt.Key_Tab:
+            active = self.get_active_panel()
+            left_active = self.left_tabs.currentWidget()
+            right_active = self.right_tabs.currentWidget()
+            
+            if active == left_active and right_active:
+                right_active.table.setFocus()
+                self._last_active_panel = right_active
+            elif active == right_active and left_active:
+                left_active.table.setFocus()
+                self._last_active_panel = left_active
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
     def execute_command(self):
         cmd = self.cmd_input.text()
         if not cmd: return
         
         active = self.get_active_panel()
-        if active._vfs_type == "sftp" and hasattr(active._vfs, 'exec_command'):
-            # Remote command via SSH
-            try:
-                output = active._vfs.exec_command(cmd, active._vfs_inner)
-                QMessageBox.information(self, "Remote Command Output", output)
-                self.cmd_input.clear()
-            except Exception as e:
-                QMessageBox.critical(self, "Remote Error", f"Command failed: {e}")
-            return
-
-        active_path = active.current_path
-        try:
-            subprocess.Popen(cmd, shell=True, cwd=active_path)
-            self.cmd_input.clear()
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to run command: {e}")
+        # Delegování spuštění na ActionManager
+        self.actions.execute_shell_command(cmd, active)
+        self.cmd_input.clear()
 
     def refresh_all(self):
         if self.left_tabs.currentWidget(): self.left_tabs.currentWidget().refresh()
@@ -236,7 +278,7 @@ class KiCommander(QMainWindow):
 
     def init_tabs(self):
         # Default fallback
-        left_path = self.settings.value("panels/left/path", os.expanduser("~") if hasattr(os, 'expanduser') else os.path.expanduser("~"))
+        left_path = self.settings.value("panels/left/path", os.path.expanduser("~") if hasattr(os, 'expanduser') else os.path.expanduser("~"))
         right_path = self.settings.value("panels/right/path", "C:\\")
         
         self.add_tab(self.left_tabs, left_path)
@@ -284,67 +326,8 @@ class KiCommander(QMainWindow):
         lock_act.triggered.connect(toggle_lock)
         
         menu.addAction("Close Tab", lambda: self.close_tab(tab_widget, idx))
+        from PySide6.QtGui import QCursor
         menu.exec(QCursor.pos())
-
-    def eventFilter(self, source, event):
-        if source is self.menuBar():
-            if event.type() == QEvent.MouseButtonPress:
-                if event.button() == Qt.LeftButton:
-                    self.drag_pos = event.globalPos() - self.frameGeometry().topLeft()
-                    self._dragging = False
-                    return False
-            elif event.type() == QEvent.MouseMove:
-                if event.buttons() == Qt.LeftButton and self.drag_pos:
-                    delta = event.globalPos() - (self.drag_pos + self.frameGeometry().topLeft())
-                    if not self._dragging and delta.manhattanLength() > 5:
-                        self._dragging = True
-                    if self._dragging:
-                        self.move(event.globalPos() - self.drag_pos)
-                        return True
-            elif event.type() == QEvent.MouseButtonRelease:
-                self.drag_pos = None
-                self._dragging = False
-        
-        # Track focus for panels
-        if event.type() == QEvent.FocusIn:
-            if source is self.left_panel.table:
-                self._last_active_panel = self.left_panel
-            elif source is self.right_panel.table:
-                self._last_active_panel = self.right_panel
-
-        return super().eventFilter(source, event)
-
-
-
-
-
-
-
-
-    def keyPressEvent(self, event):
-        key = event.key()
-        mods = event.modifiers()
-        if key == Qt.Key_F3: self.actions.op_view()
-        elif key == Qt.Key_F4: self.actions.op_edit()
-        elif key == Qt.Key_F5: self.actions.op_copy()
-        elif key == Qt.Key_F6: self.actions.op_move()
-        elif key == Qt.Key_F7: self.actions.op_mkdir()
-        elif key == Qt.Key_F8: self.actions.op_delete()
-        elif key == Qt.Key_F11: self.actions.op_multi_rename()
-        elif key == Qt.Key_D and mods & Qt.ControlModifier: self.actions.op_favorites()
-        elif key == Qt.Key_D and (mods & Qt.ControlModifier) and (mods & Qt.AltModifier): self.actions.op_compare()
-        elif key == Qt.Key_F5 and mods & Qt.AltModifier: self.actions.op_archive()
-        elif key == Qt.Key_F7 and mods & Qt.AltModifier: self.actions.op_search()
-        elif key == Qt.Key_F and mods & Qt.ControlModifier: self.actions.op_filter()
-        elif key == Qt.Key_C and mods & Qt.ControlModifier: self.actions.op_clipboard_copy(False)
-        elif key == Qt.Key_X and mods & Qt.ControlModifier: self.actions.op_clipboard_copy(True)
-        elif key == Qt.Key_V and mods & Qt.ControlModifier: self.actions.op_clipboard_paste()
-        elif key == Qt.Key_Tab:
-            if self.left_panel.table.hasFocus(): self.right_panel.table.setFocus()
-            else: self.left_panel.table.setFocus()
-        else:
-            super().keyPressEvent(event)
-
 
     def closeEvent(self, event):
         self.settings.setValue("window/geometry", self.saveGeometry())

@@ -1,6 +1,6 @@
-# KiCommander – Technická Dokumentace Architektury (v1.7)
+# KiCommander – Technická Dokumentace Architektury (v1.8.0)
 
-Tento dokument slouží jako technická reference pro implementované moduly a logiku aplikace.
+Tento dokument slouží jako technická reference pro architekturu aplikace ve verzi 1.8.0 (Refactored).
 
 ## 1. Jádro a VFS (Virtual File System)
 
@@ -46,11 +46,28 @@ Centrální worker pro souborové operace.
 - **System Clipboard**: Plná integrace s `QMimeData` a `preferredDropEffect`. Podporuje Copy/Cut/Paste mezi KiCommanderem a Průzkumníkem Windows.
 - **Archivace**: Modul `archiver.py` pro asynchronní tvorbu ZIP a 7z archivů. RAR je podporován v režimu read-only přes VFS.
 
-## 7. Interakce a UX (Total Commander Flow)
+## 7. Architektura a Modularita (v1.8.0 Updates)
 
-- **Selection Logic**: Pravé tlačítko myši je vyhrazeno pro označování (včetně tažení/paint selection). Kontextové menu je vyvoláno dlouhým stiskem (>0.5s).
-- **Drag & Drop**: Implementováno ruční spouštění `QDrag` s vynucenou operací kopírování pro bezpečnost dat při přenosu na pracovní plochu.
-- **Keyboard Power-user**: Podpora `Esc` pro okamžité odznačení, `Space` pro řádkový výběr a klasické funkční klávesy (F3-F8).
+V verzi 1.8.0 proběhla zásadní refaktorizace směrem k "Separation of Concerns".
+
+### Action Manager (`action_manager.py`)
+
+Centrální mozek aplikace. Všechny operativní metody (`op_*`) byly vyjmuty z hlavního okna `KiCommander`.
+
+- **Zodpovědnost**: Provádění souborových operací, správa síťových připojení, spouštění dialogů (Search, Sync, Rename) a koordinace VFS workerů.
+- **Signal Handling**: Spravuje zpětnou vazbu z fronty (`QueueManager`) a VFS vláken.
+
+### Dekompozice FilePanelu
+
+Třída `FilePanel` byla rozdělena na menší, specializované komponenty pro lepší udržovatelnost:
+
+- **InteractionHandler**: Zapouzdřuje veškeré vstupní události (klávesnice, myš, Drag & Drop). Implementuje "Total Commander styl" výběru pravým tlačítkem a paint selection.
+- **ContextMenuBuilder**: Dynamicky generuje kontextové menu pro soubory, složky i prázdné oblasti panelu.
+- **Selection Logic**: Pravé tlačítko myši je vyhrazeno pro označování (včetně tažení/paint selection). Kontextové menu je vyvoláno dlouhým stiskem (>0.5s) nebo přes `InteractionHandler`.
+
+### Drag & Drop
+
+Implementováno ruční spouštění `QDrag` v `InteractionHandler` s vynucenou operací kopírování pro bezpečnost dat při přenosu na pracovní plochu.
 
 ## 8. Systém fronty (Queue Manager)
 

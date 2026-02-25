@@ -1,3 +1,6 @@
+import os
+import platform
+import string
 from PySide6.QtCore import QStandardPaths, Qt, Signal
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QPushButton, QLabel
 

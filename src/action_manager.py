@@ -4,7 +4,8 @@ import json
 import subprocess
 import tempfile
 from PySide6.QtWidgets import QMessageBox, QInputDialog, QDialog, QMenu, QApplication
-from PySide6.QtCore import Qt, QUrl, QMimeData, QByteArray, QCursor
+from PySide6.QtCore import Qt, QUrl, QMimeData, QByteArray
+from PySide6.QtGui import QCursor
 import qtawesome as qta
 
 from ftp_vfs import FTPVFS
@@ -30,7 +31,15 @@ class ActionManager:
         self.mw = main_window # KiCommander instance
         
         # Connect Queue Manager overwrite signals
-        QueueManager.instance().query_overwrite.connect(self.on_queue_overwrite)
+        self.queue = QueueManager.instance()
+        self.queue.query_overwrite.connect(self.on_queue_overwrite)
+        self.queue.queue_updated.connect(self._show_transfer_mgr_if_needed)
+
+    def _show_transfer_mgr_if_needed(self):
+        """Automatically show the transfer manager if there are active or waiting items."""
+        active_items = [i for i in self.queue.items if i.status in ("Running", "Waiting")]
+        if active_items and not self.mw.transfer_widget.isVisible():
+            self.mw.transfer_widget.show()
 
     def op_view(self):
         active = self.mw.get_active_panel()
@@ -326,7 +335,6 @@ class ActionManager:
         if is_cut:
             # Tell OS it's a Cut operation
             # 2 = Cut, 5 = Copy
-            from PySide6.QtCore import QByteArray
             if sys.platform == "win32":
                 mime_data.setData("application/x-qt-windows-mime;value=\"Preferred DropEffect\"", QByteArray.fromRawData(bytes([2, 0, 0, 0])))
             else:
@@ -547,3 +555,21 @@ class ActionManager:
             
         dlg = SyncDialog(left.current_path, right.current_path, self.mw)
         dlg.exec()
+
+    def execute_shell_command(self, cmd, active_panel):
+        """Spustí příkaz v aktivním panelu (lokálně nebo přes SSH)."""
+        if active_panel._vfs_type == "sftp" and hasattr(active_panel._vfs, 'exec_command'):
+            # Remote command via SSH
+            try:
+                output = active_panel._vfs.exec_command(cmd, active_panel._vfs_inner)
+                QMessageBox.information(self.mw, "Vzdálený výstup", output)
+            except Exception as e:
+                QMessageBox.critical(self.mw, "Chyba SSH", f"Příkaz selhal:\n{e}")
+            return
+
+        # Lokální spuštění
+        active_path = active_panel.current_path
+        try:
+            subprocess.Popen(cmd, shell=True, cwd=active_path)
+        except Exception as e:
+            QMessageBox.critical(self.mw, "Chyba", f"Nepodařilo se spustit příkaz:\n{e}")

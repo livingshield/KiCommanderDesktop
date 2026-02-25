@@ -1,36 +1,32 @@
-# KiCommander Desktop - Initial Implementation
+# KiCommander Desktop - Implementation Walkthrough
 
-I have completed the foundation of KiCommander Desktop. The application is now functional with dual file panels and asynchronous directory scanning.
+I have completed the foundation and the major architectural refactor for KiCommander Desktop v1.8.0. The application is now functional, modular, and highly extensible.
 
 ## Key Features Implemented
 
-- **Double-Panel Layout:** Two independent file browsers allowing simultaneous view of different directories.
-- **Asynchronous I/O:** File system scanning is performed in a background thread (`QThread`), ensuring the UI stays responsive.
-- **MVC Architecture:** A custom `FileModel` based on `QAbstractTableModel` handles data separation.
-- **Navigation:** Navigation via double-click or **Enter key** is fully functional.
-- **Selection:** Multi-selection supported via **Spacebar** (Total Commander style).
-- **File Operations:** Fully functional **F5 (Copy)**, **F6 (Move)**, **F7 (New Folder)**, and **F8 (Delete)**.
-- **Command Line:** Integrated command bar for executing system commands in the current directory.
-- **Drive Selector:** Quick access buttons for all available system drives (C:, D:, etc.) above each panel.
-- **Quick Links Sidebar:** Vertical sidebar with shortcuts to common folders (Desktop, Downloads, Documents, etc.).
-- **Automatic Drive Detection:** Drives are automatically identified and mapped to the UI.
-- **State Persistence:** Remembers directories, window size, and position via `QSettings`.
-- **Configuration:** Secure API key management with Git protection.
+- **Double-Panel Layout**: Two independent file browsers with multi-tab support.
+- **Asynchronous I/O**: File system scanning and operations are performed in background threads, ensuring the UI stays responsive.
+- **MVC Architecture**: A custom `FileModel` based on `QAbstractTableModel` handles data separation.
+- **VFS (Virtual File System)**: Unified support for Local FS, ZIP, FTP, SFTP, and SMB.
+- **Modular Architecture (v1.8.0)**: Logic decoupled into `ActionManager`, `InteractionHandler`, and `ContextMenuBuilder`.
+- **Keyboard Power-user**: Support for `F3`-`F11` keys and Total Commander style selection.
+- **Queue Manager**: Background operation queue with progress tracking.
 
 ## Changes Made
 
-- **src/main.py:** Complete application logic with UI and event handling.
-- **src/file_model.py:** Enhanced with icon support and color coding.
-- **src/file_ops.py:** Dedicated logic for background file operations (copy, move, delete).
-- **src/style.qss:** Modern CSS-like styling for a premium look.
-- **src/fs_worker.py:** Threaded directory scanner.
+- **src/main.py**: Main window shell, manages UI layout and tabs.
+- **src/action_manager.py**: Centralized application logic and operations (Decoupled from UI).
+- **src/ui/panels/file_panel.py**: Refactored panel component using composition.
+- **src/ui/panels/interaction_handler.py**: Encapsulated event and input handling (Mouse/Keyboard/DND).
+- **src/ui/panels/context_menu.py**: Modularized context menu generation.
+- **src/style.qss**: Modern CSS-like styling (Catppuccin Mocha).
 
 ## How to Run
 
 1. Ensure you have the dependencies installed:
 
    ```bash
-   pip install PySide6 qtawesome
+   pip install -r requirements.txt
    ```
 
 2. Run the application from the root:
@@ -39,10 +35,11 @@ I have completed the foundation of KiCommander Desktop. The application is now f
    python src/main.py
    ```
 
-3. You can also run the pre-compiled version from the `bin/` directory:
+3. Pre-compiled version:
    - Run `bin/KiCommander.exe` (Windows).
 
 ## Next Steps
 
-- **Phase 4:** Adding interactive file operations (Copy, Move, Delete) and multi-selection logic.
-- **Phase 5:** Applying a comprehensive modern dark theme and final icons.
+- **Phase 24**: Implementation of automated unit tests for the `ActionManager`.
+- **Phase 25**: Cloud Storage Integration (Google Drive / Dropbox VFS).
+- **Phase 26**: Integration of AI context actions (Summarize file, explain code).

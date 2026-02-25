@@ -3,7 +3,7 @@ import hashlib
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableView, 
                              QPushButton, QLabel, QProgressBar, QCheckBox, 
                              QWidget, QHeaderView, QMenu)
-from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Signal, QThread, QSize
+from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Signal, QThread, QSize, QObject
 import qtawesome as qta
 from fs_worker import ScanWorker, FileInfo
 from queue_manager import QueueManager
@@ -247,4 +247,3 @@ class SyncDialog(QDialog):
             event.accept()
     def mouseReleaseEvent(self, event): self._drag_pos = None
 
-from PySide6.QtCore import QObject

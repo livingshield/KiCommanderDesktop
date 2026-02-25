@@ -33,9 +33,12 @@
 - [x] Phase 19: Folder Tabs (QTabWidget, Lock, Persistence) `1.8.0`
 - [x] Phase 20: Directory Synchronization (Compare, Visual Matrix) `1.8.0`
 - [x] Phase 21: Preview Improvements (Markdown, Media Player) `1.8.0`
-- [x] Phase 22: Command Line Bar (Subprocess, Remote SSH) `1.8.0`
+- [x] Phase 23: Architectural Refactoring v1.8.0
+  - [x] Extract ActionManager (Decouple logic from main window)
+  - [x] FilePanel Decomposition (InteractionHandler & ContextMenuBuilder)
+  - [x] Cleanup and Import Consolidation
 
-## Aktuální verze: 1.8.0 (Internal Release)
+## Aktuální verze: 1.8.0 (Stable Refactored)
 
 - **Novinky:**
   - Plnohodnotný **Multi-Rename Tool** s podporou regulárních výrazů a šablon.

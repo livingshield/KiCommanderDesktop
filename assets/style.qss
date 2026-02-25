@@ -301,3 +301,57 @@ QProgressBar::chunk {
     background-color: #89b4fa;
     border-radius: 3px;
 }
+
+/* Dock Widgets */
+QDockWidget {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    border: 1px solid #313244;
+    titlebar-close-icon: url(none);
+    titlebar-normal-icon: url(none);
+}
+
+QDockWidget::title {
+    background-color: #11111b;
+    padding: 6px;
+    border-bottom: 1px solid #313244;
+    text-align: left;
+    color: #89b4fa;
+    font-weight: bold;
+}
+
+/* ScrollBars */
+QScrollBar:vertical {
+    border: none;
+    background: #11111b;
+    width: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QScrollBar::handle:vertical {
+    background: #313244;
+    min-height: 20px;
+    border-radius: 5px;
+}
+QScrollBar::handle:vertical:hover {
+    background: #45475a;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {
+    border: none;
+    background: none;
+}
+
+QScrollBar:horizontal {
+    border: none;
+    background: #11111b;
+    height: 10px;
+    margin: 0px 0px 0px 0px;
+}
+QScrollBar::handle:horizontal {
+    background: #313244;
+    min-width: 20px;
+    border-radius: 5px;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
+    border: none;
+    background: none;
+}

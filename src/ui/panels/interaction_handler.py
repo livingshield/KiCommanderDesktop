@@ -18,11 +18,27 @@ class InteractionHandler:
     def eventFilter(self, source, event):
         if event.type() == QEvent.KeyPress and source is self.p.table:
             # Enter to open
+            # Enter to open, or Ctrl+Enter to copy name to command line
             if event.key() in (Qt.Key_Return, Qt.Key_Enter):
-                index = self.p.table.currentIndex()
-                if index.isValid():
-                    self.p.on_double_click(index)
+                if event.modifiers() & Qt.ControlModifier:
+                    index = self.p.table.currentIndex()
+                    if index.isValid():
+                        row = index.row()
+                        if self.p.filter_visible: row = self.p.proxy.mapToSource(index).row()
+                        f = self.p.model.get_file(row)
+                        if f and f.name != "..":
+                            mw = self.p.window()
+                            name = f.name
+                            if " " in name: name = f'"{name}"'
+                            curr_text = mw.cmd_input.text()
+                            space = " " if curr_text and not curr_text.endswith(" ") else ""
+                            mw.cmd_input.setText(curr_text + space + name)
                     return True
+                else:
+                    index = self.p.table.currentIndex()
+                    if index.isValid():
+                        self.p.on_double_click(index)
+                        return True
             # Space to toggle selection (Total Commander style)
             elif event.key() == Qt.Key_Space:
                 index = self.p.table.currentIndex()
