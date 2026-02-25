@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, QMimeData, QUrl
 from PySide6.QtGui import QColor, QBrush, QFont
 import qtawesome as qta
 import os, time, math
@@ -109,10 +109,46 @@ class FileModel(QAbstractTableModel):
     def update_files(self, files):
         self.beginResetModel()
         self.files = list(files)
-        self._apply_sort()          # keep current sort after refresh
+        self._apply_sort()
         self.endResetModel()
+
+    def clear_for_scan(self):
+        self.beginResetModel()
+        self.files = []
+        self.endResetModel()
+
+    def add_files(self, new_files):
+        if not new_files: return
+        start_row = len(self.files)
+        end_row = start_row + len(new_files) - 1
+        self.beginInsertRows(QModelIndex(), start_row, end_row)
+        self.files.extend(new_files)
+        self.endInsertRows()
 
     def get_file(self, row):
         if 0 <= row < len(self.files):
             return self.files[row]
         return None
+
+    # --- DND Support ---
+    def mimeTypes(self):
+        return ['text/uri-list']
+
+    def mimeData(self, indexes):
+        mime_data = QMimeData()
+        urls = []
+        # Get unique rows from indexes (multiple columns selected for same row)
+        rows = sorted(set(index.row() for index in indexes))
+        for row in rows:
+            f = self.files[row]
+            if f and f.name != "..":
+                # For VFS files, we use their full_path but OS might not like it
+                # For local files, QUrl.fromLocalFile works best
+                if os.path.isabs(f.full_path) and os.path.exists(f.full_path):
+                    urls.append(QUrl.fromLocalFile(f.full_path))
+                else:
+                    # Fallback for VFS or non-absolute paths
+                    urls.append(QUrl(f.full_path))
+        
+        mime_data.setUrls(urls)
+        return mime_data

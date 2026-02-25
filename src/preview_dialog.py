@@ -1,7 +1,9 @@
 import os
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPlainTextEdit, QTabWidget, QWidget, QScrollArea,
-                             QPushButton)
+                             QPushButton, QTextBrowser)
+from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
+from PySide6.QtMultimediaWidgets import QVideoWidget
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QFont
 import qtawesome as qta
@@ -95,11 +97,17 @@ class PreviewDialog(QDialog):
 
         if ext in [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".ico", ".svg"]:
             self.show_image(layout)
-        elif ext in [".txt", ".py", ".md", ".json", ".xml", ".html", ".css", ".js",
+        elif ext == ".md":
+            self.show_markdown(layout)
+        elif ext in [".txt", ".py", ".json", ".xml", ".html", ".css", ".js",
                      ".csv", ".log", ".ini", ".cfg", ".yml", ".yaml", ".toml",
                      ".bat", ".cmd", ".sh", ".ps1", ".c", ".cpp", ".h", ".java",
                      ".rs", ".go", ".ts", ".tsx", ".jsx", ".vue", ".qss"]:
             self.show_text(layout)
+        elif ext in [".mp3", ".wav", ".m4a", ".flac", ".ogg"]:
+            self.show_media(layout, video=False)
+        elif ext in [".mp4", ".mkv", ".avi", ".mov"]:
+            self.show_media(layout, video=True)
         else:
             self.show_hex(layout)
 
@@ -115,19 +123,52 @@ class PreviewDialog(QDialog):
         scroll.setWidgetResizable(True)
         layout.addWidget(scroll)
 
-    def show_text(self, layout):
-        editor = QPlainTextEdit()
-        editor.setReadOnly(True)
-        editor.setFont(QFont("Consolas", 10))
+        layout.addWidget(editor)
+
+    def show_markdown(self, layout):
+        browser = QTextBrowser()
+        browser.setStyleSheet("background-color: #181825; color: #cdd6f4; border: 1px solid #313244;")
         try:
             with open(self.file_path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read(1024 * 512)
-            editor.setPlainText(content)
-            ext = os.path.splitext(self.file_path)[1]
-            self._highlighter = CodeHighlighter(editor.document(), ext)
+                content = f.read()
+            browser.setMarkdown(content)
         except Exception as e:
-            editor.setPlainText(f"Error reading file: {e}")
-        layout.addWidget(editor)
+            browser.setPlainText(f"Error rendering markdown: {e}")
+        layout.addWidget(browser)
+
+    def show_media(self, layout, video=True):
+        container = QWidget()
+        vbox = QVBoxLayout(container)
+        
+        self.player = QMediaPlayer()
+        self.audio_output = QAudioOutput()
+        self.player.setAudioOutput(self.audio_output)
+        
+        if video:
+            video_widget = QVideoWidget()
+            video_widget.setMinimumHeight(300)
+            vbox.addWidget(video_widget)
+            self.player.setVideoOutput(video_widget)
+        else:
+            icon = QLabel()
+            icon.setPixmap(qta.icon("fa5s.music", color="#89b4fa").pixmap(64, 64))
+            icon.setAlignment(Qt.AlignCenter)
+            vbox.addWidget(icon)
+
+        controls = QHBoxLayout()
+        play_btn = QPushButton("Play")
+        play_btn.clicked.connect(self.player.play)
+        pause_btn = QPushButton("Pause")
+        pause_btn.clicked.connect(self.player.pause)
+        
+        controls.addWidget(play_btn)
+        controls.addWidget(pause_btn)
+        vbox.addLayout(controls)
+        
+        from PySide6.QtCore import QUrl
+        self.player.setSource(QUrl.fromLocalFile(self.file_path))
+        layout.addWidget(container)
+        self.player.play()
 
     def show_hex(self, layout):
         editor = QPlainTextEdit()

@@ -17,11 +17,16 @@ class FileInfo:
 
 class ScanWorker(QObject):
     finished = Signal(list)
+    chunk_filled = Signal(list)
     error = Signal(str)
 
     def __init__(self, path):
         super().__init__()
         self.path = path
+        self._is_running = True
+
+    def stop(self):
+        self._is_running = False
 
     def run(self):
         try:
@@ -33,6 +38,7 @@ class ScanWorker(QObject):
 
             with os.scandir(self.path) as it:
                 for entry in it:
+                    if not self._is_running: break
                     try:
                         stats = entry.stat()
                         is_dir = entry.is_dir()
@@ -55,11 +61,19 @@ class ScanWorker(QObject):
                             name, ext, size_str, date_str, is_dir, entry.path,
                             size_bytes, mtime
                         ))
+
+                        # Emit chunk every 100 items
+                        if len(files) % 100 == 0:
+                            self.chunk_filled.emit(files[-100:])
                     except (PermissionError, OSError):
-                        continue  # Skip files we can't access
+                        continue
+
+            # Emit final chunk if any
+            remaining = len(files) % 100
+            if remaining > 0:
+                self.chunk_filled.emit(files[-remaining:])
             
-            # Initial sort: Directories first, then by name
-            files.sort(key=lambda x: (x.name != "..", not x.is_dir, x.name.lower()))
+            # Note: Final sorting happens in the model/UI after all chunks are in
             self.finished.emit(files)
             
         except Exception as e:
@@ -76,6 +90,7 @@ class ScanWorker(QObject):
 
 class VfsWorker(QObject):
     finished = Signal(list)
+    chunk_filled = Signal(list)
     error = Signal(str)
 
     def __init__(self, vfs, inner_path):
@@ -86,9 +101,12 @@ class VfsWorker(QObject):
     def run(self):
         try:
             files = self.vfs.list_dir(self.inner_path)
-            # Sorting is usually handled by the VFS or the Model, 
-            # but we can ensure consistent baseline here.
-            files.sort(key=lambda x: (not x.is_dir, x.name.lower()))
+            # For VFS we usually get the full list from provider API,
+            # but we can still emit it in chunks to keep UI responsive
+            chunk_size = 100
+            for i in range(0, len(files), chunk_size):
+                self.chunk_filled.emit(files[i : i + chunk_size])
+            
             self.finished.emit(files)
         except Exception as e:
             self.error.emit(str(e))

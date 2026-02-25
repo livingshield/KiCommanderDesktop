@@ -97,20 +97,53 @@ class FTPVFS:
     def extract_file(self, remote_path: str, local_dest_dir: str) -> str | None:
         """Download file from FTP to local directory."""
         if not self.connect():
-            return None
+            raise Exception("FTP not connected")
         
         local_name = os.path.basename(remote_path)
         local_path = os.path.join(local_dest_dir, local_name)
         
-        try:
-            with open(local_path, "wb") as f:
-                self._ftp.retrbinary(f"RETR {remote_path}", f.write)
-            return local_path
-        except Exception as e:
-            print(f"[FTPVFS] Download failed: {e}")
-            if os.path.exists(local_path):
-                os.remove(local_path)
-            return None
+        with open(local_path, "wb") as f:
+            self._ftp.retrbinary(f"RETR {remote_path}", f.write)
+        return local_path
+
+    def upload_file(self, local_source: str, remote_dest_path: str) -> bool:
+        """Upload file from local directory to FTP."""
+        if not self.connect():
+            raise Exception("FTP not connected")
+            
+        with open(local_source, "rb") as f:
+            self._ftp.storbinary(f"STOR {remote_dest_path}", f)
+        return True
+
+    def delete_item(self, remote_path: str, is_dir: bool) -> bool:
+        """Delete file or directory from FTP."""
+        if not self.connect():
+            raise Exception("FTP not connected")
+            
+        if is_dir:
+            self._ftp.rmd(remote_path)
+        else:
+            self._ftp.delete(remote_path)
+        return True
+
+    def mkdir(self, remote_path: str) -> bool:
+        """Create a directory on FTP."""
+        if not self.connect():
+            raise Exception("FTP not connected")
+        self._ftp.mkd(remote_path)
+        return True
+
+    def extract_all(self, local_dest_dir: str) -> bool:
+        """Download entire current directory (shallow for now)."""
+        # Note: True recursive mirror is complex for an MVP.
+        # We start by downloading files in the current folder.
+        files = self.list_dir(self.current_inner)
+        success = True
+        for f in files:
+            if not f.is_dir:
+                if not self.extract_file(f.full_path, local_dest_dir):
+                    success = False
+        return success
 
     def close(self):
         if self._ftp:

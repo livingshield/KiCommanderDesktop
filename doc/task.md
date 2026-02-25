@@ -1,31 +1,46 @@
-# KiCommander Desktop Task List
+# KiCommander Desktop Task List - FINÁLNÍ STAV
 
 - [x] Phase 1: Planning and Setup
-  - [x] Analyze requirements and screenshot
-  - [x] Refine implementation plan with architectural feedback
-  - [x] Initialize project and environment (PySide6, dependencies)
 - [x] Phase 2: Core Architecture & Async Reading
-  - [x] Implement `QAbstractTableModel` for file system representation
-  - [x] Implement asynchronous directory scanning using `QThread`/`QRunnable`
-  - [x] Create Main Window with dual `QTableView` layout
-  - [x] Omit/Handle OS permission errors during scanning
-- [x] Phase 2.5: Configuration & Security
-  - [x] Setup `.gitignore` for secrets and documentation
-  - [x] Implement `config_manager.py` for API keys
-  - [x] Create `secrets.json` and sync with GitHub
 - [x] Phase 3: Navigation & State Persistence
-  - [x] Implement navigation logic (double-click, Enter, `..`)
-  - [x] Integrate `QSettings` to remember last paths and window state
-  - [x] Implement menu bar and bottom informational bars
-- [x] Phase 4: Interactive Operations (F3-F8)
-  - [x] Implement multi-selection logic (spacebar etc.)
-  - [x] Implement F3-F8 operations (Copy, Move, New Folder, Delete)
-  - [x] Add functional shell command line
-- [x] Phase 5: Modern UI & Live Updates
-  - [x] Apply modern QSS theme and icons
-  - [x] Integrate color coding and file-type icons
-  - [x] Final polishing and verification
-- [x] Phase 6: Advanced Navigation
-  - [x] Implement Drive Selection Bar
-  - [x] Implement Quick Links Sidebar (Desktop, Downloads, etc.)
-  - [x] Auto-detect available drives
+- [x] Phase 4: Network Protocols (VFS Expansion)
+  - [x] 4.1 SFTP/SSH Provider
+  - [x] 4.2 SMB Provider
+  - [x] 4.3 FTP Provider (Sjednoceno)
+  - [x] 4.4 Connection Manager (Spuštěno)
+  - [x] 4.5 VFS File Operations (Copy/Move/Delete)
+- [x] Phase 5: Performance Optimization
+  - [x] 5.1 Inkrementální načítání pro lokální FS
+  - [x] 5.2 Inkrementální načítání pro VFS
+- [x] Phase 6: Multi-platform Distribution
+  - [x] 6.1 GitHub Actions (Win/Linux/Mac)
+  - [x] 6.2 Platform-specific Tweaks (Specifikace icons/app bundle)
+- [x] Phase 7: UI Customization & Settings
+  - [x] 7.1 Settings Dialog
+  - [x] 7.2 Externí editor (F4 Integration)
+  - [x] 7.3 Deletion confirmation toggles
+- [x] Phase 8: File Comparison (Diff Tool)
+- [x] Phase 9: Duplicate Finder
+- [x] Phase 10: Batch Operation Support (Hromadné mazání)
+- [x] Phase 11: System Clipboard Integration (Ctrl+C, Ctrl+X, Ctrl+V)
+- [x] Phase 12: Archiving Support (ZIP, 7z creation; RAR read-only)
+- [x] Phase 13: Drag & Drop and TC-style Interaction
+- [x] Phase 14: Queue Manager (Background operations)
+- [x] Phase 15: Navigation Enhancements
+- [x] Phase 16: Advanced Search (Grep, VFS support)
+- [x] Phase 17: Duplicate Finder Redesign (v2 UI, Sorting, Extensions)
+- [x] Phase 18: Multi-Rename Tool (UI, Templating, Regex, Queue) `1.8.0`
+- [x] Phase 19: Folder Tabs (QTabWidget, Lock, Persistence) `1.8.0`
+- [x] Phase 20: Directory Synchronization (Compare, Visual Matrix) `1.8.0`
+- [x] Phase 21: Preview Improvements (Markdown, Media Player) `1.8.0`
+- [x] Phase 22: Command Line Bar (Subprocess, Remote SSH) `1.8.0`
+
+## Aktuální verze: 1.8.0 (Internal Release)
+
+- **Novinky:**
+  - Plnohodnotný **Multi-Rename Tool** s podporou regulárních výrazů a šablon.
+  - **Flexibilní záložky (Tabs)** pro oba panely s možností zamykání.
+  - **Synchronizace složek** s vizuálním náhledem změn a asynchronním provedením.
+  - **Vylepšený prohlížeč (F3)**: Renderování Markdownu a přehrávání videa/audia.
+  - **SSH Command Line**: Možnost spouštět příkazy přímo na vzdáleném serveru v SFTP panelu.
+- **Design:** Catppuccin Mocha s plynulými animacemi a moderními prvky.

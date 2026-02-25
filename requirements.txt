@@ -3,3 +3,5 @@ qtawesome>=1.3
 paramiko
 pysmb
 pyyaml
+py7zr
+rarfile

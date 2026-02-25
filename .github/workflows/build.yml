@@ -1,4 +1,4 @@
-name: Build & Test
+name: Multi-Platform Build
 
 on:
   push:
@@ -14,7 +14,11 @@ on:
 
 jobs:
   test:
-    runs-on: windows-latest
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -34,9 +38,13 @@ jobs:
         run: python -m pytest tests/ -v --tb=short
 
   build:
-    runs-on: windows-latest
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -58,6 +66,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: KiCommander-Windows
+          name: KiCommander-${{ matrix.os }}
           path: dist/KiCommander/
           retention-days: 30

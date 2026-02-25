@@ -14,9 +14,14 @@ secrets.json
 # Workspace
 .vscode/
 .idea/
-.gemini/
-
-# Build
+# Build and binaries
 build/
 dist/
+bin/
+build_tmp/
 *.spec
+
+# Tests and internal
+.pytest_cache/
+.agent/
+.gemini/

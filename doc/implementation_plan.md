@@ -1,56 +1,66 @@
-# KiCommander Desktop Implementation Plan
+# KiCommander – Technická Dokumentace Architektury (v1.7)
 
-Project goal: Create a robust, production-ready Python desktop application inspired by Total Commander using PySide6.
+Tento dokument slouží jako technická reference pro implementované moduly a logiku aplikace.
 
-## Proposed Changes
+## 1. Jádro a VFS (Virtual File System)
 
-### Tech Stack Refinement
+Jádro aplikace je postaveno na asynchronním modelu, který odděluje UI vlákno od operací se souborovým systémem.
 
-- **GUI Framework:** PySide6 (Qt for Python).
-- **Concurrent I/O:** `QThread` and `QRunnable` for non-blocking file system scanning.
-- **Architecture:** Strict MVC using `QAbstractTableModel` and `QTableView`.
-- **Persistence:** `QSettings` for window dimensions, last paths, and user preferences.
-- **Monitoring:** `QFileSystemWatcher` for automated UI refreshes on external changes.
+### Inkrementální načítání (Performance Pack)
 
-### Revised Phases
+- **Chunking**: `ScanWorker` a `VfsWorker` nečekají na načtení celého adresáře. Emitují signál `chunk_filled` každých 100 nalezených položek.
+- **Model Integration**: `FileModel` využívá `beginInsertRows` pro postupné přidávání dat. To umožňuje uživateli vidět první výsledky v milisekundách i u složek s 10 000+ soubory.
 
-### Phase 2: Core Architecture & Async Reading
+### VFS Provideři
 
-- **Model:** Implement `FileModel(QAbstractTableModel)` to handle data (Name, Ext, Size, Date).
-- **Async Scanner:** Implement a worker class that uses `QThread` to scan directories without freezing the GUI.
-- **View:** Set up the main window with two `QTableView` widgets.
-- **Error Handling:** Implement graceful handling of "Access Denied" or disk disconnection errors during the scanning phase.
+- **SFTPVFS**: Využívá `paramiko` pro SSH přenosy.
+- **SMBVFS**: Využívá `pysmb`. Podporuje Windows Shares přes IP i hostname.
+- **ArchiveVFS**: Read-only přístup k ZIP/TAR souborům bez nutnosti celého rozbalení.
 
-### Phase 3: Navigation & State Persistence
+## 2. Správa operací (`vfs_ops.py`)
 
-- **Navigation logic:** Handle double-click/Enter to drill down and `..` to go up.
-- **Selection:** Implement keyboard-based navigation (arrows) and focus management between panels (Tab).
-- **Persistence:** Use `QSettings` to save and restore:
-  - Last visited directory for both panels.
-  - Column widths and window geometry.
-- **UI:** Implement the menu bar and the bottom informational bars.
+Centrální worker pro souborové operace.
 
-### Phase 4: Interactive Operations (F3-F8)
+- **Cross-Platform Transfer**: Implementuje logiku pro kopírování mezi různými VFS typy (např. FTP -> SMB) pomocí dočasných temp souborů.
+- **Overwrite Resolver**: Detekuje konflikty jmen a přes signály vyvolává UI srovnávací dialog, který vrací instrukce (Overwrite/Skip/Cancel).
+- **Queue Integration**: Podpora pro asynchronní řazení operací přes `QueueManager`. Operace jsou spouštěny sekvenčně pro minimalizaci zátěže disku (I/O optimalizace).
 
-- **Multi-selection:** Implement marking files (e.g., via Spacebar or Insert).
-- **File Ops:** Implement F3 (View), F4 (Edit), F5 (Copy), F6 (Move), F7 (NewFolder), F8 (Delete).
-- **Shell:** Add a command line input for quick shell executions in the current path.
+## 3. Konfigurace a Persistence
 
-### Phase 5: Polishing & Live Updates
+- **Settings System**: Dialog `settings_dialog.py` ukládá cesty k externím editorům a globální flagy (confirm_delete) do systémového registru/plistu přes `QSettings`.
+- **Connection Manager**: Serializace ověřených připojení do `data/connections.json`.
+- **Theme Engine**: Komplexní stylopis `style.qss` definující Catppuccin Mocha paletu pro všechny Qt Widgety (včetně QTabWidget, QComboBox, QSpinBox atd.).
 
-- **FS Watcher:** Attach `QFileSystemWatcher` to current visible directories to refresh the view on changes.
-- **Styling:** Apply a modern QSS theme with high-quality icons.
-- **Unit Testing:** Focus tests on `FileModel` and async worker logic.
+## 4. Build a Distribuce
 
-## Verification Plan
+- **Specifikace**: `KiCommander.spec` je navržen jako multiplatformní. Automaticky detekuje `sys.platform` a přizpůsobuje ikony a strukturu balíčku.
+- **CI/CD**: GitHub Actions workflow (`build.yml`) testuje a kompiluje kód paralelně na Windows, Ubuntu a macOS při každém pushi.
 
-### Automated Tests
+## 5. Externí utility
 
-- Test `FileModel` sorting and formatting logic.
-- Verify thread safety between the async scanner and the UI model.
+- **Diff Tool**: Side-by-side implementace založená na `difflib.ndiff` se synchronizovanými scrollbary.
+- **Duplicate Scanner v2**: Třífázový sken s novým UI. Podporuje řazení výsledků, filtraci podle přípon a interaktivní výběr k smazání.
 
-### Manual Verification
+## 6. Clipboard a Systémová Integrace
 
-- Test navigation in "heavy" directories like `C:\Windows`.
-- Verify that permissions errors are caught and reported without crashing the app.
-- Check that the application restores its state correctly after restart.
+- **System Clipboard**: Plná integrace s `QMimeData` a `preferredDropEffect`. Podporuje Copy/Cut/Paste mezi KiCommanderem a Průzkumníkem Windows.
+- **Archivace**: Modul `archiver.py` pro asynchronní tvorbu ZIP a 7z archivů. RAR je podporován v režimu read-only přes VFS.
+
+## 7. Interakce a UX (Total Commander Flow)
+
+- **Selection Logic**: Pravé tlačítko myši je vyhrazeno pro označování (včetně tažení/paint selection). Kontextové menu je vyvoláno dlouhým stiskem (>0.5s).
+- **Drag & Drop**: Implementováno ruční spouštění `QDrag` s vynucenou operací kopírování pro bezpečnost dat při přenosu na pracovní plochu.
+- **Keyboard Power-user**: Podpora `Esc` pro okamžité odznačení, `Space` pro řádkový výběr a klasické funkční klávesy (F3-F8).
+
+## 8. Systém fronty (Queue Manager)
+
+Zaveden v v1.7 pro správu pozadí dlouhotrvajících operací.
+
+- **Singleton Pattern**: `QueueManager` udržuje globální seznam úloh.
+- **Progress Tracking**: UI komponenta `TransferManagerWidget` v reálném čase vizualizuje postup, rychlost a zbývající čas úloh ve frontě.
+
+## 9. Navigace a Vyhledávání (v1.7+)
+
+- **Interactive Breadcrumbs**: Rozklad cesty na klikatelné komponenty v `navigation_utils.py`. Automatická synchronizace s VFS cestami.
+- **Directory History**: Per-panel implementace `deque(maxlen=20)` pro bleskový návrat.
+- **Advanced Search**: Rozšíření o VFS podporu. Prohledávání archivů a síťových disků využívá temp extrakci do paměti/disku pro Grep operace.

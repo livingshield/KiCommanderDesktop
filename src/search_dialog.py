@@ -22,9 +22,11 @@ class SearchWorker(QObject):
 
     def __init__(self, root_path, name_pattern, content_pattern="",
                  case_sensitive=False, search_subdirs=True,
-                 min_size=0, max_size=0, min_date=0, max_date=0):
+                 min_size=0, max_size=0, min_date=0, max_date=0,
+                 vfs=None):
         super().__init__()
         self.root_path = root_path
+        self.vfs = vfs
         self.name_pattern = name_pattern
         self.content_pattern = content_pattern
         self.case_sensitive = case_sensitive
@@ -34,6 +36,7 @@ class SearchWorker(QObject):
         self.min_date = min_date    # epoch, 0 = no limit
         self.max_date = max_date    # epoch, 0 = no limit
         self._cancelled = False
+        self.count = 0
 
     def cancel(self):
         self._cancelled = True
@@ -89,43 +92,91 @@ class SearchWorker(QObject):
         return True
 
     def run(self):
-        count = 0
-        for dirpath, dirnames, filenames in os.walk(self.root_path):
-            if self._cancelled:
-                break
-            self.progress.emit(dirpath)
-            
-            for fname in filenames:
+        self.count = 0
+        if self.vfs:
+            self._walk_vfs(self.root_path)
+        else:
+            for dirpath, dirnames, filenames in os.walk(self.root_path):
                 if self._cancelled:
                     break
+                self.progress.emit(dirpath)
                 
-                full = os.path.join(dirpath, fname)
-                name_ok = self._match_name(fname)
+                for fname in filenames:
+                    if self._cancelled:
+                        break
+                    
+                    full = os.path.join(dirpath, fname)
+                    name_ok = self._match_name(fname)
+                    
+                    if not name_ok:
+                        continue
+                    
+                    # Apply size/date filters
+                    if (self.min_size or self.max_size or self.min_date or self.max_date):
+                        if not self._check_size_date(full):
+                            continue
+                    
+                    # Content search mode
+                    if self.content_pattern:
+                        match_line = self._search_content(full)
+                        if match_line:
+                            size_str = self._get_size(full)
+                            self.found.emit(fname, dirpath, size_str, match_line)
+                            self.count += 1
+                    else:
+                        size_str = self._get_size(full)
+                        self.found.emit(fname, dirpath, size_str, "")
+                        self.count += 1
+
+                if not self.search_subdirs:
+                    break
+
+        self.finished.emit(self.count)
+
+    def _walk_vfs(self, path):
+        """Recursive VFS listing."""
+        if self._cancelled: return
+        
+        self.progress.emit(path)
+        try:
+            items = self.vfs.list_dir(path)
+        except Exception:
+            return
+
+        for item in items:
+            if self._cancelled: break
+            if item.name == "..": continue
+            
+            if item.is_dir:
+                if self.search_subdirs:
+                    self._walk_vfs(item.full_path)
+            else:
+                # File
+                name_ok = self._match_name(item.name)
+                if not name_ok: continue
                 
-                if not name_ok:
+                # Filters
+                if (self.min_size and item.size_bytes < self.min_size) or \
+                   (self.max_size and item.size_bytes > self.max_size) or \
+                   (self.min_date and item.mtime < self.min_date) or \
+                   (self.max_date and item.mtime > self.max_date):
                     continue
                 
-                # Apply size/date filters
-                if (self.min_size or self.max_size or self.min_date or self.max_date):
-                    if not self._check_size_date(full):
-                        continue
-                
-                # Content search mode
+                # Content
+                match_line = ""
                 if self.content_pattern:
-                    match_line = self._search_content(full)
-                    if match_line:
-                        size_str = self._get_size(full)
-                        self.found.emit(fname, dirpath, size_str, match_line)
-                        count += 1
-                else:
-                    size_str = self._get_size(full)
-                    self.found.emit(fname, dirpath, size_str, "")
-                    count += 1
-
-            if not self.search_subdirs:
-                break
-
-        self.finished.emit(count)
+                    import tempfile
+                    with tempfile.TemporaryDirectory() as tmp:
+                        try:
+                            local_tmp = self.vfs.extract_file(item.full_path, tmp)
+                            if local_tmp:
+                                match_line = self._search_content(local_tmp)
+                        except: pass
+                
+                if not self.content_pattern or match_line:
+                    size_str = self._format_size(item.size_bytes)
+                    self.found.emit(item.name, path, size_str, match_line)
+                    self.count += 1
 
     def _get_size(self, path):
         try:
@@ -145,12 +196,13 @@ class SearchWorker(QObject):
 class SearchDialog(QDialog):
     navigate_to = Signal(str)
 
-    def __init__(self, start_path, parent=None):
+    def __init__(self, start_path, parent=None, vfs=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setMinimumSize(750, 580)
         self.start_path = start_path
+        self.vfs = vfs
         self.thread = None
         self.worker = None
         self._drag_pos = None
@@ -516,7 +568,8 @@ class SearchDialog(QDialog):
             case_sensitive=self.case_check.isChecked(),
             search_subdirs=self.subdirs_check.isChecked(),
             min_size=min_size, max_size=max_size,
-            min_date=min_date, max_date=max_date
+            min_date=min_date, max_date=max_date,
+            vfs=self.vfs
         )
         self.worker.moveToThread(self.thread)
         self.thread.started.connect(self.worker.run)
