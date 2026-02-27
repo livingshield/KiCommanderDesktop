@@ -32,6 +32,37 @@ class DirSizeWorker(QObject):
             pass
         self.finished.emit(total, files, dirs)
 
+class ChecksumWorker(QObject):
+    """Calculates file checksums (MD5, SHA1, SHA256) in background."""
+    finished = Signal(dict)
+
+    def __init__(self, path):
+        super().__init__()
+        self.path = path
+
+    def run(self):
+        import hashlib
+        md5 = hashlib.md5()
+        sha1 = hashlib.sha1()
+        sha256 = hashlib.sha256()
+        
+        try:
+            with open(self.path, 'rb') as f:
+                for chunk in iter(lambda: f.read(4096 * 1024), b""):
+                    md5.update(chunk)
+                    sha1.update(chunk)
+                    sha256.update(chunk)
+            
+            res = {
+                "MD5": md5.hexdigest(),
+                "SHA1": sha1.hexdigest(),
+                "SHA256": sha256.hexdigest()
+            }
+        except Exception as e:
+            res = {"Error": str(e)}
+            
+        self.finished.emit(res)
+
 
 class PropertiesDialog(QDialog):
     def __init__(self, file_path, parent=None):
@@ -162,10 +193,18 @@ class PropertiesDialog(QDialog):
                 self.contains_label = self._val("Calculating...")
                 form.addRow("Total Size:", self.size_label)
                 form.addRow("Contains:", self.contains_label)
-                self._start_dir_size()
             else:
                 size_str = f"{self._format_size(st.st_size)}  ({st.st_size:,} bytes)"
                 form.addRow("Size:", self._val(size_str))
+                
+                # Checksums
+                self.md5_label = self._val("Calculating...")
+                self.sha1_label = self._val("Calculating...")
+                self.sha256_label = self._val("Calculating...")
+                form.addRow("MD5:", self.md5_label)
+                form.addRow("SHA1:", self.sha1_label)
+                form.addRow("SHA256:", self.sha256_label)
+                self._start_checksum_worker()
 
             form.addRow("Created:", self._val(
                 time.strftime("%d.%m.%Y  %H:%M:%S", time.localtime(st.st_ctime))))
@@ -235,6 +274,26 @@ class PropertiesDialog(QDialog):
     def _on_dir_size_done(self, total, files, dirs):
         self.size_label.setText(f"{self._format_size(total)}  ({total:,} bytes)")
         self.contains_label.setText(f"{files:,} files, {dirs:,} folders")
+
+    def _start_checksum_worker(self):
+        self._chk_thread = QThread(self)
+        self._chk_worker = ChecksumWorker(self.file_path)
+        self._chk_worker.moveToThread(self._chk_thread)
+        self._chk_thread.started.connect(self._chk_worker.run)
+        self._chk_worker.finished.connect(self._on_checksum_done)
+        self._chk_worker.finished.connect(self._chk_thread.quit)
+        self._chk_thread.start()
+
+    def _on_checksum_done(self, hashes: dict):
+        if "Error" in hashes:
+            err = hashes["Error"]
+            self.md5_label.setText(err)
+            self.sha1_label.setText(err)
+            self.sha256_label.setText(err)
+        else:
+            self.md5_label.setText(hashes.get("MD5", ""))
+            self.sha1_label.setText(hashes.get("SHA1", ""))
+            self.sha256_label.setText(hashes.get("SHA256", ""))
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
