@@ -73,6 +73,7 @@ class KiCommander(QMainWindow):
         menubar = self.menuBar()
         file_menu = menubar.addMenu("Files")
         file_menu.addAction(qta.icon("fa5s.cog", color="#94e2d5"), "Settings", lambda: bus.action_requested.emit("settings"))
+        file_menu.addAction(qta.icon("fa5s.clock", color="#f9e2af"), "Change Attributes/Timestamps", lambda: bus.action_requested.emit("change_attributes"))
         file_menu.addSeparator()
         file_menu.addAction("Exit", self.close, "Alt+F4")
         

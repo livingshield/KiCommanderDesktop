@@ -30,6 +30,7 @@ from multi_rename_dialog import MultiRenameDialog
 from sync_dialog import SyncDialog
 from dialogs.network_connect_dialogs import SFTPConnectDialog, SMBConnectDialog
 from chmod_dialog import ChmodDialog
+from attributes_dialog import AttributesDialog
 from event_bus import bus
 from logger import log
 
@@ -71,6 +72,7 @@ class ActionManager:
             "search": self.op_search,
             "filter": self.op_filter,
             "change_permissions": self.op_chmod,
+            "change_attributes": self.op_attributes,
             "connect_ftp": self.op_connect_ftp,
             "connect_sftp": self.op_connect_sftp,
             "connect_smb": self.op_connect_smb,
@@ -197,6 +199,63 @@ class ActionManager:
                 bus.action_requested.emit("refresh")
             except Exception as e:
                 QMessageBox.critical(self.mw, "Error", f"Failed to change permissions:\n{e}")
+
+    def op_attributes(self):
+        active = self.mw.get_active_panel()
+        items = active.get_selected_items()
+        if not items:
+            return
+            
+        dlg = AttributesDialog(items, is_vfs=bool(active._vfs), parent=self.mw)
+        if dlg.exec() == QDialog.Accepted:
+            try:
+                for f in items:
+                    if f.name == "..":
+                        continue
+                        
+                    # Handle VFS
+                    if active._vfs:
+                        # VFS mostly doesn't support generic utime/chmod natively without dedicated method
+                        # Just log and skip unless implemented
+                        log.warning("Attribute change on VFS not fully supported yet.")
+                        continue
+                        
+                    # 1. Timestamps
+                    if dlg.new_mtime is not None:
+                        os.utime(f.full_path, (dlg.new_mtime, dlg.new_mtime))
+                        
+                    # 2. Attributes (Windows)
+                    if sys.platform == "win32":
+                        import ctypes
+                        FILE_ATTRIBUTE_READONLY = 1
+                        FILE_ATTRIBUTE_HIDDEN = 2
+                        
+                        attrs = ctypes.windll.kernel32.GetFileAttributesW(f.full_path)
+                        if attrs != -1:
+                            if dlg.apply_readonly is True:
+                                attrs |= FILE_ATTRIBUTE_READONLY
+                            elif dlg.apply_readonly is False:
+                                attrs &= ~FILE_ATTRIBUTE_READONLY
+                                
+                            if dlg.apply_hidden is True:
+                                attrs |= FILE_ATTRIBUTE_HIDDEN
+                            elif dlg.apply_hidden is False:
+                                attrs &= ~FILE_ATTRIBUTE_HIDDEN
+                                
+                            ctypes.windll.kernel32.SetFileAttributesW(f.full_path, attrs)
+                    else:
+                        # POSIX readonly is effectively lacking w bit
+                        if dlg.apply_readonly is not None:
+                            mode = os.stat(f.full_path).st_mode
+                            if dlg.apply_readonly:
+                                os.chmod(f.full_path, mode & ~stat.S_IWRITE)
+                            else:
+                                os.chmod(f.full_path, mode | stat.S_IWRITE)
+
+                bus.action_requested.emit("refresh")
+                self.mw.statusBar().showMessage(f"Atributy aktualizovány pro {len(items)} položek.")
+            except Exception as e:
+                QMessageBox.critical(self.mw, "Chyba", f"Nepodařilo se změnit atributy:\n{e}")
 
     def run_plugin(self, plugin):
         """Execute a plugin with the selected files from the active panel."""

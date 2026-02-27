@@ -57,6 +57,7 @@ class ContextMenuBuilder:
                 
                 menu.addSeparator()
                 menu.addAction(qta.icon("fa5s.info-circle", color="#89b4fa"), "Properties (Alt+Enter)", lambda: self.p.show_properties(file_info.full_path))
+                menu.addAction(qta.icon("fa5s.clock", color="#f9e2af"), "Change Attributes/Timestamps", lambda: bus.action_requested.emit("change_attributes"))
                 menu.addAction(qta.icon("fa5s.key", color="#f9e2af"), "Change Permissions (Chmod)", lambda: bus.action_requested.emit("change_permissions"))
             else:
                 # Click on [..] or empty area
