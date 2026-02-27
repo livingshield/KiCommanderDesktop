@@ -48,20 +48,42 @@
   - [x] 25.3 Thread-Safe Logovací Systém (QueueHandler pro QThread)
   - [x] 25.4 Event Bus (Kompletní decoupling UI od logiky přes signály)
 
-- [ ] Phase 26: Architecture Integration & Risk Mitigation (v2.0.0)
+- [x] Phase 26: Architecture Integration & Risk Mitigation (v2.0.0)
   - [x] 26.1 EventBus Integration: Odpojení `FilePanel` od `ActionManager` monolitických volání pomocí custom signálů.
   - [x] 26.2 Queue & Action Refactor: Centralizace odchytu signálů v `ActionManageru` a zamezení přímým importům dialogů.
   - [x] 26.3 Unified Logging: Odstranění všech volných `print()` a logování přes centrální sběrnici v klíčových filech.
   - [x] 26.4 Exception Mitigation: Oprava tichých pádů `except: pass` aspoň na úroveň chyby v logu (archive_vfs, sftp_vfs atd.).
-  - [ ] 26.5 Aktualizace testů a finalizace V2 verze.
+  - [x] 26.5 Aktualizace testů a finalizace V2 verze.
 
-## Aktuální verze: 1.9.0 (Enterprise Hardened)
+- [x] Phase 27: UX & Feature Expansion (v2.1.0)
+  - [x] 27.1 Integrovaný Quick View Panel (Náhledový panel): Implementace bočního panelu pro okamžitý náhled souborů.
+  - [x] 27.2 Rozšířené Povolení a Vlastníci (Permissions & Ownership)
+  - [x] 27.3 Vestavěný Terminálový Emulátor / SSH Konzolový Tab
+  - [x] 27.4 Directory Tree (Stromová Navigace) nad panely
+  - [x] 27.5 Icon Preview (Náhled ikon v nastavení)
+
+- [x] Phase 28: Advanced Search & Bookmarks (v2.2.0)
+  - [x] 28.1 Perzistentní okno vyhledávání (Výsledky v samostatném tabu)
+  - [x] 28.2 Správce záložek / Přenastavení oblíbených položek
+  - [x] 28.3 Systém témat (Možnost přepnout Mocha/Macchiato/Frappé/Latte)
+  - [x] 28.4 Cloud Drive Integration (Základní podpora pro Google Drive VFS)
+
+- [ ] Phase 29: Advanced File Operations & Metadata (v2.3.0)
+  - [ ] 29.1 Bulk Atributy a Časová razítka (Změna data vytvoření/úpravy v GUI)
+  - [ ] 29.2 File Checksums (Verifikace a generování MD5, SHA1, SHA256 v dialogu Vlastnosti)
+  - [ ] 29.3 File Splitting & Combining (Rozdělování a spojování velkých souborů)
+  - [ ] 29.4 Integrovaný Hex/Binary Viewer v Quick View Panelu
+
+## Aktuální verze: 2.2.0 (Search & Themes Update)
 
 - **Novinky:**
-  - Plnohodnotný **Multi-Rename Tool** s podporou regulárních výrazů a šablon.
-  - **Flexibilní záložky (Tabs)** pro oba panely s možností zamykání.
-  - **Synchronizace složek** s vizuálním náhledem změn a asynchronním provedením.
-  - **Vylepšený prohlížeč (F3)**: Renderování Markdownu, přehrávání videa/audia a rozšířená podpora obrázků (**HEIC, WEBP**).
-  - **Resizability**: Všechny dialogy jsou nyní roztahovatelné s vizuálními "grip" tečkami a kurzory.
-  - **SSH Command Line**: Možnost spouštět příkazy přímo na vzdáleném serveru v SFTP panelu.
-- **Design:** Catppuccin Mocha s plynulými animacemi a moderními prvky.
+  - Architektura poháněná **EventBus** odděluje UI okna a logických managerů.
+  - Plnohodnotné **Mypy Type Hinting** bez kritických chyb (úroveň striktních chyb `0`).
+  - **Asynchronní Logger** s frontou proti deadlockům.
+  - Testovací integrace přes `pytest` a Mock.
+  - Všechny tiché chyby aplikací VFS řešeny přes error handling.
+  - Ostré nasazení pro Google Drive a FTP klienta.
+  - Persistentní VFS struktura uvnitř vyhledávání.
+  - Rychlý rozcestník pomocí BookmarksDialog manageru.
+  - Dynamické `Catppuccin` barevné témata.
+- **Design:** Catppuccin palety s plynulými animacemi a moderními prvky.
