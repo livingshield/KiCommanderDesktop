@@ -83,7 +83,7 @@ class KiCommander(QMainWindow):
         cmd_menu.addAction(qta.icon("fa5s.globe", color="#f9e2af"), "Connect to FTP", lambda: bus.action_requested.emit("connect_ftp"), "Ctrl+K")
         cmd_menu.addAction(qta.icon("fa5s.lock", color="#a6e3a1"), "Connect to SFTP/SSH", lambda: bus.action_requested.emit("connect_sftp"), "Ctrl+Shift+K")
         cmd_menu.addAction(qta.icon("fa5s.server", color="#cba6f7"), "Connect to SMB/Windows Share", lambda: bus.action_requested.emit("connect_smb"), "Ctrl+M")
-        cmd_menu.addAction(qta.icon("fa5.google", color="#89b4fa"), "Connect to Google Drive", lambda: bus.action_requested.emit("connect_gdrive"))
+        cmd_menu.addAction(qta.icon("fa5b.google", color="#89b4fa"), "Connect to Google Drive", lambda: bus.action_requested.emit("connect_gdrive"))
         cmd_menu.addSeparator()
         cmd_menu.addAction(qta.icon("fa5s.bookmark", color="#fab387"), "Saved Connections…", lambda: bus.action_requested.emit("connection_manager"), "Ctrl+L")
         cmd_menu.addSeparator()
