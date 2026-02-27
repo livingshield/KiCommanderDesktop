@@ -1,0 +1,5 @@
+﻿src\connection_manager.py:165: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src\smb_vfs.py:23: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src\plugin_manager.py:29: error: Need type annotation for "plugins" (hint: "plugins: list[<type>] = ...")  [var-annotated]
+src\sftp_vfs.py:20: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]
+src\sftp_vfs.py:21: note: By default the bodies of untyped functions are not checked, consider using --check-untyped-defs  [annotation-unchecked]

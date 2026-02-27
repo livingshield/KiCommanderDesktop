@@ -1,6 +1,7 @@
 import os
 from PySide6.QtCore import Qt, QEvent, QTimer, QItemSelectionModel
 from PySide6.QtWidgets import QTabWidget, QApplication
+from event_bus import bus
 
 class InteractionHandler:
     def __init__(self, panel):
@@ -76,11 +77,15 @@ class InteractionHandler:
         
         if event.type() == QEvent.FocusIn:
             self.p.got_focus.emit(self.p)
+            if not self.p._vfs:
+                bus.directory_selected.emit(self.p.current_path)
             return False
 
         # --- Total Commander Style Mouse Handling ---
         elif event.type() == QEvent.MouseButtonPress and source is self.p.table.viewport():
             self.p.got_focus.emit(self.p)
+            if not self.p._vfs:
+                bus.directory_selected.emit(self.p.current_path)
             index = self.p.table.indexAt(event.position().toPoint())
             if event.button() == Qt.RightButton:
                 if index.isValid():
@@ -171,11 +176,13 @@ class InteractionHandler:
                     if f and f.is_dir and f.name != "..":
                         target_path = f.full_path if not self.p._vfs else os.path.join(self.p._vfs_inner, f.name)
 
-                self.p.window().actions.run_op('copy', sources, target_path)
+                from event_bus import bus
+                bus.file_operation_requested.emit('copy', sources, target_path)
                 event.acceptProposedAction()
                 return True
 
         return False
+
 
     def _on_rmb_timer(self):
         """Called when RMB is held long enough to show context menu."""

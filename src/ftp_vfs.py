@@ -6,6 +6,7 @@ import os
 import ftplib
 import time
 from fs_worker import FileInfo
+from logger import log
 
 
 class FTPVFS:
@@ -33,7 +34,7 @@ class FTPVFS:
             self._ftp.voidcmd("TYPE I")
             return True
         except Exception as e:
-            print(f"[FTPVFS] Connection failed: {e}")
+            log.error(f"[FTPVFS] Connection failed: {e}")
             self._ftp = None
             return False
 
@@ -59,7 +60,7 @@ class FTPVFS:
                     
                     # Parse modification time (YYYYMMDDHHMMSS)
                     mtime_str = facts.get("modify")
-                    mtime = 0
+                    mtime: float = 0.0
                     date_str = ""
                     if mtime_str:
                         try:
@@ -84,14 +85,14 @@ class FTPVFS:
                 return files
             except (ftplib.error_perm, AttributeError):
                 # Fallback to LIST
-                lines = []
+                lines: list[str] = []
                 self._ftp.retrlines(f"LIST {path}", lines.append)
                 # Note: Parsing LIST output is notoriously fragile. 
                 # For this MVP we prioritize MLSD.
                 # In a real app we'd use a robust parser like 'ftpparser'.
                 return [] 
         except Exception as e:
-            print(f"[FTPVFS] list_dir failed: {e}")
+            log.error(f"[FTPVFS] list_dir failed: {e}")
             return []
 
     def extract_file(self, remote_path: str, local_dest_dir: str) -> str | None:

@@ -5,8 +5,9 @@ from PySide6.QtCore import QObject, Signal, QThread
 
 try:
     import py7zr
+    HAS_PY7ZR = True
 except ImportError:
-    py7zr = None
+    HAS_PY7ZR = False
 
 class ArchiveWorker(QObject):
     progress = Signal(int, str)
@@ -24,7 +25,7 @@ class ArchiveWorker(QObject):
             if self.archive_type == 'zip':
                 self._create_zip()
             elif self.archive_type == '7z':
-                if not py7zr:
+                if not HAS_PY7ZR:
                     self.finished.emit(False, "py7zr library is not installed.")
                     return
                 self._create_7z()

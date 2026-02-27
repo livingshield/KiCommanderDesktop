@@ -9,6 +9,7 @@ import os
 import importlib
 import importlib.util
 import sys
+from logger import log
 
 
 class PluginInfo:
@@ -20,12 +21,12 @@ class PluginInfo:
         self.module = module
 
 
-def discover_plugins(plugins_dir: str) -> list:
+def discover_plugins(plugins_dir: str) -> list[PluginInfo]:
     """
     Scan plugins_dir for Python files that export the plugin interface.
     Returns list of PluginInfo.
     """
-    plugins = []
+    plugins: list[PluginInfo] = []
     if not os.path.isdir(plugins_dir):
         return plugins
 
@@ -51,6 +52,6 @@ def discover_plugins(plugins_dir: str) -> list:
             if name and menu_text and callable(action_fn):
                 plugins.append(PluginInfo(name, menu_text, action_fn, mod))
         except Exception as e:
-            print(f"[PluginManager] Failed to load {fname}: {e}")
+            log.error(f"[PluginManager] Failed to load {fname}: {e}")
 
     return plugins

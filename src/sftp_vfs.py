@@ -7,6 +7,7 @@ import stat
 import time
 import paramiko
 from fs_worker import FileInfo
+from logger import log
 
 
 class SFTPVFS:
@@ -49,7 +50,7 @@ class SFTPVFS:
             self._sftp = ssh.open_sftp()
             return True
         except Exception as e:
-            print(f"[SFTPVFS] Connection failed: {e}")
+            log.error(f"[SFTPVFS] Connection failed: {e}")
             self._ssh = None
             self._sftp = None
             return False
@@ -62,6 +63,7 @@ class SFTPVFS:
         """Return list of FileInfo for the given remote path."""
         if not self.connect():
             raise Exception(f"SFTP connection to {self.host} failed")
+        assert self._sftp is not None
 
         path = path or "/"
         files = []
@@ -73,6 +75,17 @@ class SFTPVFS:
                 mtime = attr.st_mtime or 0
                 date_str = time.strftime("%d.%m.%Y %H:%M", time.localtime(mtime)) if mtime else ""
 
+                import stat
+                permissions = stat.filemode(attr.st_mode) if attr.st_mode else ""
+                owner, group = str(attr.st_uid or 0), str(attr.st_gid or 0)
+                
+                # Attempt to parse longname for string owner/group
+                if attr.longname:
+                    parts = attr.longname.split()
+                    if len(parts) >= 4:
+                        owner = parts[2]
+                        group = parts[3]
+
                 fi = FileInfo(
                     name=name,
                     ext="" if is_dir else os.path.splitext(name)[1].lstrip("."),
@@ -82,10 +95,13 @@ class SFTPVFS:
                     full_path=f"{path.rstrip('/')}/{name}",
                     size_bytes=size_bytes,
                     mtime=mtime,
+                    owner=owner,
+                    group=group,
+                    permissions=permissions
                 )
                 files.append(fi)
         except Exception as e:
-            print(f"[SFTPVFS] list_dir failed for '{path}': {e}")
+            log.error(f"[SFTPVFS] list_dir failed for '{path}': {e}")
         return files
 
     # ------------------------------------------------------------------ #
@@ -96,6 +112,7 @@ class SFTPVFS:
         """Download a file from the SFTP server."""
         if not self.connect():
             raise Exception("SFTP not connected")
+        assert self._sftp is not None
 
         local_name = os.path.basename(remote_path)
         local_path = os.path.join(local_dest_dir, local_name)
@@ -106,18 +123,33 @@ class SFTPVFS:
         """Upload a local file to the SFTP server."""
         if not self.connect():
             raise Exception("SFTP not connected")
+        assert self._sftp is not None
 
         self._sftp.put(local_source, remote_dest_path)
         return True
 
     # ------------------------------------------------------------------ #
-    #  Deletion & creation
+    #  Deletion & creation & modifications
     # ------------------------------------------------------------------ #
+
+    def chmod(self, remote_path: str, mode: int) -> bool:
+        """Change permissions of a remote file."""
+        if not self.connect():
+            raise Exception("SFTP not connected")
+        assert self._sftp is not None
+        
+        try:
+            self._sftp.chmod(remote_path, mode)
+            return True
+        except Exception as e:
+            log.error(f"[SFTPVFS] Chmod failed for '{remote_path}': {e}")
+            raise
 
     def delete_item(self, remote_path: str, is_dir: bool) -> bool:
         """Delete a file or directory on the SFTP server."""
         if not self.connect():
             raise Exception("SFTP not connected")
+        assert self._sftp is not None
 
         if is_dir:
             self._rmdir_recursive(remote_path)
@@ -127,9 +159,10 @@ class SFTPVFS:
 
     def _rmdir_recursive(self, path: str):
         """Recursively remove a remote directory."""
+        assert self._sftp is not None
         for attr in self._sftp.listdir_attr(path):
             item_path = f"{path}/{attr.filename}"
-            if stat.S_ISDIR(attr.st_mode):
+            if attr.st_mode is not None and stat.S_ISDIR(attr.st_mode):
                 self._rmdir_recursive(item_path)
             else:
                 self._sftp.remove(item_path)
@@ -139,6 +172,7 @@ class SFTPVFS:
         """Create a directory on the SFTP server."""
         if not self.connect():
             raise Exception("SFTP not connected")
+        assert self._sftp is not None
 
         self._sftp.mkdir(remote_path)
         return True
@@ -147,6 +181,7 @@ class SFTPVFS:
         """Execute a shell command on the remote server via SSH."""
         if not self.connect():
             raise Exception("SFTP connection to host failed")
+        assert self._ssh is not None
         
         full_cmd = f"cd '{workdir}' && {cmd}"
         stdin, stdout, stderr = self._ssh.exec_command(full_cmd)
@@ -158,12 +193,17 @@ class SFTPVFS:
 
     def close(self):
         if self._sftp:
-            try: self._sftp.close()
-            except: pass
+            try: 
+                self._sftp.close()
+            except Exception as e:
+                log.error(f"[SFTPVFS] Error closing SFTP session: {e}")
             self._sftp = None
+            
         if self._ssh:
-            try: self._ssh.close()
-            except: pass
+            try: 
+                self._ssh.close()
+            except Exception as e:
+                log.error(f"[SFTPVFS] Error closing SSH session: {e}")
             self._ssh = None
 
     # ------------------------------------------------------------------ #

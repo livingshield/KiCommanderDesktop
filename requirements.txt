@@ -5,3 +5,5 @@ pysmb
 pyyaml
 py7zr
 rarfile
+pillow
+pillow-heif

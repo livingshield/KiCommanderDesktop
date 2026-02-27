@@ -2,7 +2,7 @@ import os
 import hashlib
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QTableView, 
                              QPushButton, QLabel, QProgressBar, QCheckBox, 
-                             QWidget, QHeaderView, QMenu)
+                             QWidget, QHeaderView, QMenu, QSizeGrip)
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex, Signal, QThread, QSize, QObject
 import qtawesome as qta
 from fs_worker import ScanWorker, FileInfo
@@ -111,10 +111,14 @@ class SyncDialog(QDialog):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setMinimumSize(1000, 700)
+        self.setMouseTracking(True)
         self.left_path = left_path
         self.right_path = right_path
         self._drag_pos = None
-
+        self._resize_margin = 8
+        self._resizing = False
+        self._resize_edge = None
+        
         self.setup_ui()
 
     def setup_ui(self):
@@ -176,11 +180,18 @@ class SyncDialog(QDialog):
         self.sync_btn.setEnabled(False)
         self.sync_btn.clicked.connect(self._execute_sync)
         
-        btns.addWidget(self.compare_btn)
-        btns.addStretch()
         btns.addWidget(self.sync_btn)
         layout.addLayout(btns)
         self.main_layout.addWidget(content)
+
+        # Bottom Size Grip (the "dots")
+        grip_layout = QHBoxLayout()
+        grip_layout.setContentsMargins(0, 0, 0, 0)
+        grip_layout.addStretch()
+        grip = QSizeGrip(self)
+        grip.setFixedSize(16, 16)
+        grip_layout.addWidget(grip, 0, Qt.AlignBottom | Qt.AlignRight)
+        self.main_layout.addLayout(grip_layout)
 
         self.setStyleSheet("""
             #DialogContainer { background-color: #1e1e2e; border: 1px solid #313244; border-radius: 10px; }
@@ -238,12 +249,72 @@ class SyncDialog(QDialog):
         self.accept()
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and self.title_bar.underMouse():
-            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
+        if event.button() == Qt.LeftButton:
+            edge = self._get_edge(event.position().toPoint())
+            if edge:
+                self._resizing = True
+                self._resize_edge = edge
+                event.accept()
+            elif self.title_bar.underMouse():
+                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
+
     def mouseMoveEvent(self, event):
-        if self._drag_pos and event.buttons() & Qt.LeftButton:
+        pos = event.position().toPoint()
+        if not event.buttons():
+            edge = self._get_edge(pos)
+            self._update_cursor(edge)
+            return
+
+        if self._resizing and self._resize_edge:
+            self._handle_resize(event.globalPosition().toPoint())
+            event.accept()
+        elif self._drag_pos and event.buttons() & Qt.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
-    def mouseReleaseEvent(self, event): self._drag_pos = None
+
+    def mouseReleaseEvent(self, event):
+        self._drag_pos = None
+        self._resizing = False
+        self._resize_edge = None
+
+    def _get_edge(self, pos):
+        w, h = self.width(), self.height()
+        m = self._resize_margin
+        on_left = pos.x() < m
+        on_right = pos.x() > w - m
+        on_top = pos.y() < m
+        on_bottom = pos.y() > h - m
+        
+        if on_left and on_top: return "top-left"
+        if on_right and on_top: return "top-right"
+        if on_left and on_bottom: return "bottom-left"
+        if on_right and on_bottom: return "bottom-right"
+        if on_left: return "left"
+        if on_right: return "right"
+        if on_top: return "top"
+        if on_bottom: return "bottom"
+        return None
+
+    def _update_cursor(self, edge):
+        if edge in ("top", "bottom"): self.setCursor(Qt.SizeVerCursor)
+        elif edge in ("left", "right"): self.setCursor(Qt.SizeHorCursor)
+        elif edge in ("top-left", "bottom-right"): self.setCursor(Qt.SizeBDiagCursor)
+        elif edge in ("top-right", "bottom-left"): self.setCursor(Qt.SizeFDiagCursor)
+        else: self.setCursor(Qt.ArrowCursor)
+
+    def _handle_resize(self, global_pos):
+        rect = self.geometry()
+        edge = self._resize_edge
+        min_w, min_h = self.minimumSize().width(), self.minimumSize().height()
+        
+        if "left" in edge:
+            new_w = rect.right() - global_pos.x()
+            if new_w >= min_w: rect.setLeft(global_pos.x())
+        if "right" in edge: rect.setRight(global_pos.x())
+        if "top" in edge:
+            new_h = rect.bottom() - global_pos.y()
+            if new_h >= min_h: rect.setTop(global_pos.y())
+        if "bottom" in edge: rect.setBottom(global_pos.y())
+        self.setGeometry(rect)
 

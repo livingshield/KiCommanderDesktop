@@ -50,10 +50,10 @@ class TestFileModelBasics:
         assert model.rowCount() == len(sample_files)
 
     def test_column_count(self, model):
-        assert model.columnCount() == 4
+        assert model.columnCount() == 6
 
     def test_headers(self, model):
-        for i, name in enumerate(["Name", "Ext", "Size", "Date"]):
+        for i, name in enumerate(["Name", "Ext", "Size", "Date", "Attr", "Owner"]):
             header = model.headerData(i, Qt.Horizontal)
             assert name in header
 

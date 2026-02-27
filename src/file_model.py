@@ -8,7 +8,7 @@ class FileModel(QAbstractTableModel):
         super().__init__()
         self._source_files = files or []
         self.files = list(self._source_files)
-        self.headers = ["Name", "Ext", "Size", "Date"]
+        self.headers = ["Name", "Ext", "Size", "Date", "Attr", "Owner"]
         
         self._sort_col = 0        # default: Name
         self._sort_asc = True     # default: ascending
@@ -32,6 +32,10 @@ class FileModel(QAbstractTableModel):
             return f._size_bytes
         elif self._sort_col == 3: # Date – epoch timestamp
             return f._mtime
+        elif self._sort_col == 4: # Attr
+            return getattr(f, "permissions", "")
+        elif self._sort_col == 5: # Owner
+            return getattr(f, "owner", "")
         return f.name.lower()
 
     def _apply_sort(self):
@@ -43,10 +47,10 @@ class FileModel(QAbstractTableModel):
         files.sort(key=self._sort_key, reverse=not self._sort_asc)
         self.files = up + dirs + files
 
-    def sort(self, column: int, order: Qt.SortOrder = Qt.AscendingOrder):
+    def sort(self, column: int, order: Qt.SortOrder = Qt.SortOrder.AscendingOrder):
         """Called by QHeaderView when user clicks a column header."""
         self._sort_col = column
-        self._sort_asc = (order == Qt.AscendingOrder)
+        self._sort_asc = (order == Qt.SortOrder.AscendingOrder)
         self.layoutAboutToBeChanged.emit()
         self._apply_sort()
         self.layoutChanged.emit()
@@ -91,6 +95,8 @@ class FileModel(QAbstractTableModel):
         if col == 1: return file.ext
         if col == 2: return file.size
         if col == 3: return file.date
+        if col == 4: return getattr(file, "permissions", "")
+        if col == 5: return getattr(file, "owner", "")
         return None
 
     def headerData(self, section, orientation, role=Qt.DisplayRole):

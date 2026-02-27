@@ -11,6 +11,7 @@ import qtawesome as qta
 from ftp_vfs import FTPVFS
 from sftp_vfs import SFTPVFS
 from smb_vfs import SMBVFS
+from gdrive_vfs import GDriveVFS, GDRIVE_AVAILABLE
 from archive_vfs import ArchiveVFS, is_archive
 from fs_worker import FileInfo
 from archiver import ArchiveThread
@@ -18,6 +19,9 @@ from vfs_ops import VfsOpThread
 from queue_manager import QueueManager
 from settings_dialog import SettingsDialog
 from search_dialog import SearchDialog
+from search_vfs import SearchVFS
+from ui.panels.file_panel import FilePanel
+from bookmarks_dialog import BookmarksDialog
 from duplicate_view import DuplicateDialog
 from diff_viewer import DiffDialog
 from connection_manager import ConnectionManagerDialog
@@ -25,6 +29,9 @@ from operation_dialogs import CopyMoveDialog
 from multi_rename_dialog import MultiRenameDialog
 from sync_dialog import SyncDialog
 from dialogs.network_connect_dialogs import SFTPConnectDialog, SMBConnectDialog
+from chmod_dialog import ChmodDialog
+from event_bus import bus
+from logger import log
 
 class ActionManager:
     def __init__(self, main_window):
@@ -34,6 +41,48 @@ class ActionManager:
         self.queue = QueueManager.instance()
         self.queue.query_overwrite.connect(self.on_queue_overwrite)
         self.queue.queue_updated.connect(self._show_transfer_mgr_if_needed)
+        bus.action_requested.connect(self.handle_action)
+        bus.file_operation_requested.connect(self.run_op)
+
+    def handle_action(self, action: str):
+        if "|" in action:
+            parts = action.split("|", 1)
+            if parts[0] == "navigate":
+                self.mw.get_active_panel().refresh_path(parts[1])
+            return
+            
+        routes = {
+            "view": self.op_view,
+            "edit": self.op_edit,
+            "copy": self.op_copy,
+            "move": self.op_move,
+            "mkdir": self.op_mkdir,
+            "delete": self.op_delete,
+            "rename": self.op_rename_current,
+            "properties": self.op_properties,
+            "archive": self.op_archive,
+            "clipboard_copy": lambda: self.op_clipboard_copy(is_cut=False),
+            "clipboard_cut": lambda: self.op_clipboard_copy(is_cut=True),
+            "clipboard_paste": self.op_clipboard_paste,
+            "compare": self.op_compare,
+            "duplicates": self.op_find_duplicates,
+            "multi_rename": self.op_multi_rename,
+            "sync": self.op_sync,
+            "search": self.op_search,
+            "filter": self.op_filter,
+            "change_permissions": self.op_chmod,
+            "connect_ftp": self.op_connect_ftp,
+            "connect_sftp": self.op_connect_sftp,
+            "connect_smb": self.op_connect_smb,
+            "connect_gdrive": self.op_connect_gdrive,
+            "connection_manager": self.op_connection_manager,
+            "favorites": self.op_favorites,
+            "settings": self.op_settings,
+        }
+        if action in routes:
+            routes[action]()
+        else:
+            log.warning(f"Unknown Action requested over EventBus: {action}")
 
     def _show_transfer_mgr_if_needed(self):
         """Automatically show the transfer manager if there are active or waiting items."""
@@ -92,11 +141,62 @@ class ActionManager:
         root_path = active.current_path if not active._vfs else active._vfs_inner
         dlg = SearchDialog(root_path, self.mw, vfs=active._vfs)
         dlg.navigate_to.connect(active.refresh_path)
+        dlg.feed_to_panel.connect(self._open_search_results)
         dlg.exec()
+
+    def _open_search_results(self, results_data):
+        active = self.mw.get_active_panel()
+        from ui.panels.file_panel import FilePanel
+        
+        # Decide which tab widget to use (usually the active one)
+        tab_widget = None
+        for i in range(self.mw.left_tabs.count()):
+            if self.mw.left_tabs.widget(i) == active:
+                tab_widget = self.mw.left_tabs
+                break
+        if not tab_widget:
+            tab_widget = self.mw.right_tabs
+            
+        # Create a new FilePanel base path on current panel paths
+        new_panel = FilePanel(active.current_path)  # base path
+        vfs = SearchVFS(results_data, source_vfs=active._vfs)
+        
+        idx = tab_widget.addTab(new_panel, "🔍 Search Results")
+        tab_widget.setCurrentIndex(idx)
+        
+        # Enable VFS mode on the new panel (requires patching FilePanel if needed to handle custom VFS without root string formatting issues, but it should work)
+        new_panel._enter_vfs(vfs, "search", "")
 
     def op_filter(self):
         active = self.mw.get_active_panel()
         active.toggle_filter()
+
+    def op_chmod(self):
+        active = self.mw.get_active_panel()
+        items = active.get_selected_items()
+        if not items:
+            return
+            
+        f = items[0]
+        if f.name == "..":
+            return
+            
+        dlg = ChmodDialog(f, is_vfs=bool(active._vfs), parent=self.mw)
+        if dlg.exec() == QDialog.Accepted:
+            new_mode = dlg.new_mode
+            try:
+                if active._vfs:
+                    if hasattr(active._vfs, 'chmod'):
+                        active._vfs.chmod(f.full_path, new_mode)
+                    else:
+                        QMessageBox.warning(self.mw, "Unsupported", "This filesystem does not support changing permissions.")
+                else:
+                    os.chmod(f.full_path, new_mode)
+                
+                # Refresh
+                bus.action_requested.emit("refresh")
+            except Exception as e:
+                QMessageBox.critical(self.mw, "Error", f"Failed to change permissions:\n{e}")
 
     def run_plugin(self, plugin):
         """Execute a plugin with the selected files from the active panel."""
@@ -162,6 +262,25 @@ class ActionManager:
                      port=data["port"], domain=data["domain"])
         active = self.mw.get_active_panel()
         active._enter_vfs(vfs, "smb", "/")
+
+    def op_connect_gdrive(self):
+        """Connect to Google Drive using credentials.json."""
+        if not GDRIVE_AVAILABLE:
+            QMessageBox.critical(self.mw, "Chyba", "Google Drive API knihovny nejsou nainstalovány (google-api-python-client atd.).")
+            return
+            
+        try:
+            vfs = GDriveVFS()
+            # Test authentication in advance
+            vfs.connect()
+            
+            active = self.mw.get_active_panel()
+            active._enter_vfs(vfs, "gdrive", "/")
+            self.mw.statusBar().showMessage("Připojeno k Google Drive.")
+        except FileNotFoundError as e:
+            QMessageBox.warning(self.mw, "Chybějící credentials", str(e) + "\n\nStáhněte client_secret.json z Google Cloud a přejmenujte jej na credentials.json do složky programu.")
+        except Exception as e:
+            QMessageBox.critical(self.mw, "Google Drive Error", f"Nepodařilo se připojit:\n{e}")
 
     def op_connection_manager(self):
         """Open the Connection Manager and connect to the selected server."""
@@ -477,28 +596,47 @@ class ActionManager:
     def op_favorites(self):
         """Management oblíbených složek (Hotlist)."""
         active = self.mw.get_active_panel()
-        favs = self.mw.settings.value("favorites/list", [])
-        if not favs: favs = []
-        if isinstance(favs, str): favs = [favs]
+        
+        # Load bookmarks
+        saved = self.mw.settings.value("bookmarks/data", "[]")
+        bookmarks = []
+        if isinstance(saved, str):
+            try:
+                bookmarks = json.loads(saved)
+            except:
+                pass
+
+        # Legacy migration check just for the menu
+        old_favs = self.mw.settings.value("favorites/list", [])
+        if old_favs:
+            if isinstance(old_favs, str):
+                old_favs = [old_favs]
+            for p in old_favs:
+                bookmarks.append({"name": p, "path": p})
+            self.mw.settings.remove("favorites/list")
+            self.mw.settings.setValue("bookmarks/data", json.dumps(bookmarks))
         
         menu = QMenu(self.mw)
-        menu.setStyleSheet("QMenu { background-color: #1e1e2e; color: #cdd6f4; border: 1px solid #45475a; }")
+        menu.setStyleSheet("QMenu { background-color: #1e1e2e; color: #cdd6f4; border: 1px solid #45475a; padding: 4px; } QMenu::item:selected { background-color: #313244; }")
         
-        # Přidat aktuální
         curr = active.current_path if not active._vfs else f"[{active._vfs_type.upper()}] {active._vfs_inner}"
-        add_action = menu.addAction(qta.icon("fa5s.plus-circle", color="#a6e3a1"), f"Přidat aktuální: {curr[:30]}...")
         
+        # Add Current
+        add_action = menu.addAction(qta.icon("fa5s.plus-circle", color="#a6e3a1"), f"Přidat aktuální: {curr[:30]}...")
         def add_fav():
-            if curr not in favs:
-                favs.append(curr)
-                self.mw.settings.setValue("favorites/list", favs)
+            # Check if exists
+            for b in bookmarks:
+                if b["path"] == curr: return
+            bookmarks.append({"name": os.path.basename(curr) or curr, "path": curr})
+            self.mw.settings.setValue("bookmarks/data", json.dumps(bookmarks))
         add_action.triggered.connect(add_fav)
         
         menu.addSeparator()
         
-        for p in favs:
-            action = menu.addAction(p)
-            def navigate(target=p):
+        for b in bookmarks:
+            action = menu.addAction(qta.icon("fa5s.bookmark", color="#fab387"), b.get("name", "Unknown"))
+            def navigate(target=b.get("path", "")):
+                if not target: return
                 if target.startswith("["):
                     tag_end = target.find("]")
                     if tag_end != -1:
@@ -509,12 +647,15 @@ class ActionManager:
                     active.refresh_path(target)
             action.triggered.connect(navigate)
             
-        if favs:
-            menu.addSeparator()
-            clear_action = menu.addAction(qta.icon("fa5s.eraser", color="#f38ba8"), "Vymazat vše")
-            clear_action.triggered.connect(lambda: self.mw.settings.setValue("favorites/list", []))
+        menu.addSeparator()
+        config_action = menu.addAction(qta.icon("fa5s.cog", color="#89b4fa"), "Spravovat záložky...")
+        config_action.triggered.connect(lambda: self._open_bookmarks_manager(curr, active.current_path))
 
         menu.exec(QCursor.pos())
+
+    def _open_bookmarks_manager(self, current_vfs_tag, current_path):
+        dlg = BookmarksDialog(current_vfs_tag, current_path, self.mw)
+        dlg.exec()
 
     def op_multi_rename(self):
         """Hromadné přejmenování vybraných souborů."""
@@ -573,3 +714,21 @@ class ActionManager:
             subprocess.Popen(cmd, shell=True, cwd=active_path)
         except Exception as e:
             QMessageBox.critical(self.mw, "Chyba", f"Nepodařilo se spustit příkaz:\n{e}")
+
+    def op_rename_current(self):
+        """Přejmenuje vybraný prvek v aktivním panelu (Shift+F6)."""
+        active = self.mw.get_active_panel()
+        items = active.get_selected_items()
+        if items:
+            f = items[0]
+            if f.name != "..":
+                active.rename_file(f)
+
+    def op_properties(self):
+        """Zobrazí vlastnosti vybraného prvku (Alt+Enter)."""
+        active = self.mw.get_active_panel()
+        items = active.get_selected_items()
+        if items:
+            from properties_dialog import PropertiesDialog
+            dlg = PropertiesDialog(items[0].full_path, self.mw)
+            dlg.exec()

@@ -8,17 +8,21 @@ import zipfile
 import tarfile
 import time
 import logging
+from logger import log
 from fs_worker import FileInfo
 
 try:
     import py7zr
+    HAS_PY7ZR = True
 except ImportError:
-    py7zr = None
+    HAS_PY7ZR = False
 
 try:
     import rarfile
+    HAS_RARFILE = True
 except ImportError:
-    rarfile = None
+    HAS_RARFILE = False
+
 
 ARCHIVE_EXTENSIONS = {
     ".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz",
@@ -38,13 +42,14 @@ def is_archive(path: str) -> bool:
     return False
 
 
-def _format_size(size: int) -> str:
+def _format_size(size: float) -> str:
     if size < 0: return "0 B"
     for unit in ["B", "KB", "MB", "GB"]:
         if size < 1024:
             return f"{size:.0f} {unit}"
         size /= 1024
     return f"{size:.1f} TB"
+
 
 
 class ArchiveVFS:
@@ -58,10 +63,11 @@ class ArchiveVFS:
         self._is_rar = False
 
         if not self._is_zip and not self._is_tar:
-            if py7zr and py7zr.is_7zfile(archive_path):
+            if HAS_PY7ZR and py7zr.is_7zfile(archive_path):
                 self._is_7z = True
-            elif rarfile and rarfile.is_rarfile(archive_path):
+            elif HAS_RARFILE and rarfile.is_rarfile(archive_path):
                 self._is_rar = True
+
 
     def list_dir(self, inner_path: str = "") -> list:
         """List contents of a directory inside the archive."""
@@ -104,7 +110,8 @@ class ArchiveVFS:
                                      _format_size(info.file_size), date_str, False, 
                                      prefix + child_name, info.file_size, mtime)
                     entries[child_name] = fi
-        except: pass
+        except Exception as e:
+            log.error(f"[ArchiveVFS] Failed to list ZIP {self.archive_path}: {e}")
         return list(entries.values())
 
     def _list_tar(self, inner_path: str) -> list:
@@ -133,7 +140,8 @@ class ArchiveVFS:
                                      _format_size(member.size), date_str, False, 
                                      prefix + child_name, member.size, mtime)
                     entries[child_name] = fi
-        except: pass
+        except Exception as e:
+            log.error(f"[ArchiveVFS] Failed to list TAR {self.archive_path}: {e}")
         return list(entries.values())
 
     def _list_7z(self, inner_path: str) -> list:
@@ -162,7 +170,8 @@ class ArchiveVFS:
                                      _format_size(info.uncompressed), date_str, False, 
                                      prefix + child_name, info.uncompressed, mtime)
                     entries[child_name] = fi
-        except: pass
+        except Exception as e:
+            log.error(f"[ArchiveVFS] Failed to list 7z {self.archive_path}: {e}")
         return list(entries.values())
 
     def _list_rar(self, inner_path: str) -> list:
@@ -192,7 +201,8 @@ class ArchiveVFS:
                                      _format_size(info.file_size), date_str, False, 
                                      prefix + child_name, info.file_size, mtime)
                     entries[child_name] = fi
-        except: pass
+        except Exception as e:
+            log.error(f"[ArchiveVFS] Failed to list RAR {self.archive_path}: {e}")
         return list(entries.values())
 
     def extract_file(self, inner_path: str, dest_dir: str) -> str | None:
@@ -213,7 +223,9 @@ class ArchiveVFS:
                     rf.extract(inner_path, dest_dir)
             
             return os.path.join(dest_dir, inner_path.replace("/", os.sep))
-        except: return None
+        except Exception as e:
+            log.error(f"[ArchiveVFS] Failed to extract {inner_path} from {self.archive_path}: {e}")
+            return None
 
     def extract_all(self, dest_dir: str) -> bool:
         """Extract entire archive to dest_dir."""

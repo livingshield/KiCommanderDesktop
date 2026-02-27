@@ -1,5 +1,7 @@
 import json
 import os
+import sys
+from logger import log
 
 class ConfigManager:
     def __init__(self):
@@ -15,10 +17,10 @@ class ConfigManager:
                 with open(self.secrets_file, 'r') as f:
                     self.secrets = json.load(f)
             except Exception as e:
-                print(f"Error loading secrets: {e}")
+                log.error(f"Error loading secrets: {e}")
                 self.secrets = {}
         else:
-            print(f"Secrets file {self.secrets_file} not found.")
+            log.warning(f"Secrets file {self.secrets_file} not found.")
 
     def get_api_key(self, name):
         return self.secrets.get("api_keys", {}).get(name)

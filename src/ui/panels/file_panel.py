@@ -18,6 +18,7 @@ from archive_vfs import ArchiveVFS, is_archive
 
 from ui.panels.interaction_handler import InteractionHandler
 from ui.panels.context_menu import ContextMenuBuilder
+from event_bus import bus
 
 class FilePanel(QWidget):
     got_focus = Signal(object) # emits self
@@ -101,9 +102,11 @@ class FilePanel(QWidget):
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.table.horizontalHeader().setStretchLastSection(True)
         # Default column widths: Name wider, others compact
-        self.table.setColumnWidth(0, 280)  # Name
-        self.table.setColumnWidth(1, 60)   # Ext
-        self.table.setColumnWidth(2, 90)   # Size
+        self.table.setColumnWidth(0, 240)  # Name
+        self.table.setColumnWidth(1, 50)   # Ext
+        self.table.setColumnWidth(2, 70)   # Size
+        self.table.setColumnWidth(3, 110)  # Date
+        self.table.setColumnWidth(4, 80)   # Attr
         
         # --- Drag and Drop ---
         self.table.setDragEnabled(True)
@@ -113,6 +116,7 @@ class FilePanel(QWidget):
         self.table.setDefaultDropAction(Qt.CopyAction)
         
         self.table.doubleClicked.connect(self.on_double_click)
+        self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
         # Context menu is strictly manual via timer
         self.table.setContextMenuPolicy(Qt.NoContextMenu) 
         self.table.installEventFilter(self)
@@ -189,6 +193,19 @@ class FilePanel(QWidget):
             if file_info and file_info.name != " .. ":
                 paths.append(file_info.full_path)
         return paths
+
+    def _on_selection_changed(self, selected, deselected):
+        # Notify the rest of the app (e.g. QuickView) about the newly focused item
+        indices = self.table.selectionModel().selectedRows()
+        if indices:
+            row = indices[0].row()
+            if self.filter_visible:
+                row = self.proxy.mapToSource(indices[0]).row()
+            file_info = self.model.get_file(row)
+            if file_info:
+                bus.selection_changed.emit(file_info)
+        else:
+            bus.selection_changed.emit(None)
 
 
     def _enter_vfs(self, vfs, vfs_type, inner=""):
@@ -282,6 +299,7 @@ class FilePanel(QWidget):
         self.path_label.setText(self.current_path)
         self.breadcrumbs.set_path(self.current_path)
         self.folder_changed.emit(os.path.basename(self.current_path) or self.current_path)
+        bus.directory_selected.emit(self.current_path)
         
         # Update history
         if not self.history or self.history[-1] != self.current_path:
@@ -410,9 +428,9 @@ class FilePanel(QWidget):
     def _on_header_clicked(self, col: int):
         """Toggle asc/desc on same column, switch to asc on new column."""
         if self.model._sort_col == col:
-            order = Qt.DescendingOrder if self.model._sort_asc else Qt.AscendingOrder
+            order = Qt.SortOrder.DescendingOrder if self.model._sort_asc else Qt.SortOrder.AscendingOrder
         else:
-            order = Qt.AscendingOrder
+            order = Qt.SortOrder.AscendingOrder
         self.model.sort(col, order)
         self.table.horizontalHeader().viewport().update()
 

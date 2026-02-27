@@ -9,6 +9,7 @@ import math
 import socket
 from smb.SMBConnection import SMBConnection
 from fs_worker import FileInfo
+from logger import log
 
 
 class SMBVFS:
@@ -53,7 +54,7 @@ class SMBVFS:
             self._conn = conn
             return True
         except Exception as e:
-            print(f"[SMBVFS] Connection failed: {e}")
+            log.error(f"[SMBVFS] Connection failed: {e}")
             self._conn = None
             return False
 
@@ -65,6 +66,7 @@ class SMBVFS:
         """Return list of FileInfo for the given remote path on the share."""
         if not self.connect():
             raise Exception(f"SMB connection to \\\\{self.host}\\{self.share} failed")
+        assert self._conn is not None
 
         path = path or "/"
         files = []
@@ -92,7 +94,7 @@ class SMBVFS:
                 )
                 files.append(fi)
         except Exception as e:
-            print(f"[SMBVFS] list_dir failed for '{path}': {e}")
+            log.error(f"[SMBVFS] list_dir failed for '{path}': {e}")
         return files
 
     # ------------------------------------------------------------------ #
@@ -103,6 +105,7 @@ class SMBVFS:
         """Download a file from the SMB share to a local directory."""
         if not self.connect():
             raise Exception("SMB not connected")
+        assert self._conn is not None
 
         local_name = os.path.basename(remote_path)
         local_path = os.path.join(local_dest_dir, local_name)
@@ -114,6 +117,7 @@ class SMBVFS:
         """Upload a local file to the SMB share."""
         if not self.connect():
             raise Exception("SMB not connected")
+        assert self._conn is not None
 
         with open(local_source, "rb") as f:
             self._conn.storeFile(self.share, remote_dest_path, f)
@@ -127,6 +131,7 @@ class SMBVFS:
         """Delete a file or directory on the SMB share."""
         if not self.connect():
             raise Exception("SMB not connected")
+        assert self._conn is not None
 
         if is_dir:
             self._rmdir_recursive(remote_path)
@@ -136,6 +141,7 @@ class SMBVFS:
 
     def _rmdir_recursive(self, path: str):
         """Recursively remove a remote directory."""
+        assert self._conn is not None
         for entry in self._conn.listPath(self.share, path):
             if entry.filename in (".", ".."):
                 continue
@@ -150,6 +156,7 @@ class SMBVFS:
         """Create a directory on the SMB share."""
         if not self.connect():
             raise Exception("SMB not connected")
+        assert self._conn is not None
 
         self._conn.createDirectory(self.share, remote_path)
         return True

@@ -81,3 +81,58 @@ Zaveden v v1.7 pro správu pozadí dlouhotrvajících operací.
 - **Interactive Breadcrumbs**: Rozklad cesty na klikatelné komponenty v `navigation_utils.py`. Automatická synchronizace s VFS cestami.
 - **Directory History**: Per-panel implementace `deque(maxlen=20)` pro bleskový návrat.
 - **Advanced Search**: Rozšíření o VFS podporu. Prohledávání archivů a síťových disků využívá temp extrakci do paměti/disku pro Grep operace.
+
+## 10. UI Polish a Vizualizace (v1.8.x)
+
+- **Frameless Resizability**: Implementace vlastní logiky pro změnu velikosti bezrámových oken. Detekce okrajů (`_get_edge`) a dynamická aktualizace kurzorů (`setCursor(Qt.SizeHorCursor)` atd.).
+- **Visual Grips**: Integrace `QSizeGrip` do všech modálních dialogů pro vizuální vedení uživatele.
+- **Preview Engine**: Rozšíření prohlížeče (F3) o `Pillow` a `pillow-heif` pro nativní podporu Apple HEIC a moderních WEBP formátů.
+
+## Enterprise Architectural Hardening (v1.9.0 Plan - Completed)
+
+- **Robustní Testovací Infrastruktura**: Zaveden `pytest` a mockování QThread vláken pro asynchronní manažery.
+- **Parametry & Typování**: Projekt je validován přes `Mypy` s fixními VFS a paramiko / 7z rozhraními.
+- **Logování**: Zaveden `QueueHandler` logger pro Thread-Safe odchytávání výjimek z dělníků.
+- **Event Bus Pobočka**: Připraven objekt EventBus pro decouple.
+
+## Architecture Integration & Risk Mitigation (v2.0.0 - Phase 26 - Plan)
+
+> [!WARNING]
+> Během kompletní kontroly aplikace pro verzi 1.9 byly identifikovány závažné "slepé body" a nedostatečně propojené architektury. Tyto body představují technický dluh, který ohrožuje stabilitu aplikace při dalším rozšiřování.
+
+### Identified Risks & Weak Points
+
+1. **Unused EventBus (Mrtvý kód) & Těsná vazba (Tight Coupling)**
+   - Nově vytvořený `event_bus.py` není nikde napojen.
+   - `action_manager.py` je stále Monolit (God Object - ~600 řádků), který ručně importuje desítky UI dialogů a je spouštěn přímými handlery z `file_panel.py`.
+   - **Riziko**: Kód je těžko testovatelný a UI nelze snadno modifikovat bez rozbití logiky.
+
+2. **Incomplete Logger Adoption (Částečné logování)**
+   - VFS moduly používají nový logger, ale kritické komponenty jako `action_manager.py`, `queue_manager.py`, `archiver.py` a `fs_worker.py` logger dosud nevyužívají naplno.
+   - **Riziko**: Pokud spadne asynchronní kopírování kvůli nečekaným chybám disku, v logu nebude stopa.
+
+3. **Silent Failures (`except: pass`)**
+   - Různé moduly (`archive_vfs.py`, `sftp_vfs.py`, `search_dialog.py`) aktivně "polykají" chyby pomocí `except: pass`.
+   - **Riziko**: Poškozené archivy nebo dočasné neočekávané síťové pády nevygenerují exception a selžou tiše, což způsobí zmatení uživatele.
+
+### Proposed Solutions (Next Steps)
+
+#### 1. Implementace Event Bus & Demontáž Monolitu
+
+- Přepsat volání z `FilePanel`, `ContextMenu` a klávesových zkratek, aby pouze vysílaly signály (např. `bus.file_operation_requested.emit()`).
+- Refaktorovat `ActionManager`, aby pouze naslouchal na `EventBus` a neobsahoval žádnou logiku vykreslování UI.
+
+#### 2. Centralizace a vynucení Loggování
+
+- Nahradit zbývající potlačené výjimky (`except: pass`) strukturou `except Exception as e: log.error(f"Error ctx: {e}")`.
+- Napojit logování na `QueueManager` a zrušit používání print() / debug hlášek v `search_dialog.py` a `fs_worker.py`.
+
+#### 3. Testovací pokrytí Event Busu
+
+- Po zapojení event busu garantovat, že staré unit testy a fronty reagují na simulované signály z Event Busu.
+
+## Verification Plan pro Phase 26
+
+- Spustit pytest nad celým nově odpojeným systémem.
+- Zapnout Event Bus a demonstrovat volání bez UI referencí.
+- Zkontrolovat `logs/kicommander.log`, zda chytá pády z `archive_vfs.py` při simulaci rozbitých zipů.

@@ -3,9 +3,12 @@ import time
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLineEdit, 
                              QPushButton, QLabel, QTableWidget, QTableWidgetItem,
                              QComboBox, QCheckBox, QProgressBar, QHeaderView,
-                             QGroupBox, QFileDialog, QSpinBox, QDateEdit, QWidget)
+                             QGroupBox, QFileDialog, QSpinBox, QDateEdit, QWidget, QSizeGrip)
 from PySide6.QtCore import Qt, QThread, Signal, QObject, QDate
 import qtawesome as qta
+import stat
+
+from fs_worker import FileInfo
 
 TEXT_EXTENSIONS = {
     ".txt", ".py", ".md", ".json", ".xml", ".html", ".css", ".js",
@@ -16,7 +19,7 @@ TEXT_EXTENSIONS = {
 }
 
 class SearchWorker(QObject):
-    found = Signal(str, str, str, str)  # name, path, size, match_info
+    found = Signal(object, str)  # file_info, match_info
     finished = Signal(int)
     progress = Signal(str)
 
@@ -116,16 +119,28 @@ class SearchWorker(QObject):
                         if not self._check_size_date(full):
                             continue
                     
+                    # Stat the file for FileInfo
+                    try:
+                        stats = os.stat(full)
+                        size_bytes = stats.st_size
+                        mtime = stats.st_mtime
+                        size_str = self.format_size(size_bytes)
+                        date_str = time.strftime('%d.%m.%Y %H:%M', time.localtime(mtime))
+                        ext = os.path.splitext(fname)[1].lstrip('.')
+                        perms = stat.filemode(stats.st_mode)
+                        file_info = FileInfo(fname, ext, size_str, date_str, False, full, size_bytes, mtime, permissions=perms)
+                    except OSError:
+                        # Fallback
+                        file_info = FileInfo(fname, "", "0 B", "", False, full)
+
                     # Content search mode
                     if self.content_pattern:
                         match_line = self._search_content(full)
                         if match_line:
-                            size_str = self._get_size(full)
-                            self.found.emit(fname, dirpath, size_str, match_line)
+                            self.found.emit(file_info, match_line)
                             self.count += 1
                     else:
-                        size_str = self._get_size(full)
-                        self.found.emit(fname, dirpath, size_str, "")
+                        self.found.emit(file_info, "")
                         self.count += 1
 
                 if not self.search_subdirs:
@@ -171,11 +186,11 @@ class SearchWorker(QObject):
                             local_tmp = self.vfs.extract_file(item.full_path, tmp)
                             if local_tmp:
                                 match_line = self._search_content(local_tmp)
-                        except: pass
+                        except Exception as e:
+                            log.error(f"[SearchWorker] VFS extraction failed for {item.name}: {e}")
                 
                 if not self.content_pattern or match_line:
-                    size_str = self._format_size(item.size_bytes)
-                    self.found.emit(item.name, path, size_str, match_line)
+                    self.found.emit(item, match_line)
                     self.count += 1
 
     def _get_size(self, path):
@@ -195,17 +210,23 @@ class SearchWorker(QObject):
 
 class SearchDialog(QDialog):
     navigate_to = Signal(str)
+    feed_to_panel = Signal(list)
 
     def __init__(self, start_path, parent=None, vfs=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setMinimumSize(750, 580)
+        self.setMinimumSize(800, 600)
+        self.setMouseTracking(True)
         self.start_path = start_path
         self.vfs = vfs
         self.thread = None
         self.worker = None
         self._drag_pos = None
+        self._resize_margin = 8
+        self._resizing = False
+        self._resize_edge = None
+        self.results_data = [] # List of FileInfo objects
         self.setup_ui()
 
     def setup_ui(self):
@@ -490,6 +511,14 @@ class SearchDialog(QDialog):
         self.cancel_btn.setEnabled(False)
         self.cancel_btn.setToolTip("Stop the current search")
         btn_layout.addWidget(self.cancel_btn)
+        
+        self.feed_btn = QPushButton("  Zobrazit v panelu")
+        self.feed_btn.setIcon(qta.icon("fa5s.list-ul", color="#cba6f7"))
+        self.feed_btn.clicked.connect(self.feed_results)
+        self.feed_btn.setEnabled(False)
+        self.feed_btn.setToolTip("Display results in a new file panel tab")
+        btn_layout.addWidget(self.feed_btn)
+        
         btn_layout.addStretch()
         layout.addLayout(btn_layout)
 
@@ -576,23 +605,31 @@ class SearchDialog(QDialog):
         self.worker.found.connect(self.on_found)
         self.worker.progress.connect(lambda d: self.progress_label.setText(f"Scanning: {d}"))
         self.worker.finished.connect(self.on_search_finished)
+        
+        self.results_data.clear()
+        self.feed_btn.setEnabled(False)
         self.thread.start()
 
     def cancel_search(self):
         if self.worker:
             self.worker.cancel()
 
-    def on_found(self, name, path, size, match_info):
+    def on_found(self, file_info, match_info):
+        self.results_data.append(file_info)
         row = self.results_table.rowCount()
         self.results_table.insertRow(row)
-        self.results_table.setItem(row, 0, QTableWidgetItem(name))
-        self.results_table.setItem(row, 1, QTableWidgetItem(path))
-        self.results_table.setItem(row, 2, QTableWidgetItem(size))
+        dirpath = os.path.dirname(file_info.full_path)
+        self.results_table.setItem(row, 0, QTableWidgetItem(file_info.name))
+        self.results_table.setItem(row, 1, QTableWidgetItem(dirpath))
+        self.results_table.setItem(row, 2, QTableWidgetItem(file_info.size))
         self.results_table.setItem(row, 3, QTableWidgetItem(match_info))
 
     def on_search_finished(self, count):
         self.search_btn.setEnabled(True)
         self.cancel_btn.setEnabled(False)
+        if count > 0:
+            self.feed_btn.setEnabled(True)
+            
         self.progress_label.setText("Done")
         self.status_label.setText(f"Found {count} files.")
         if self.thread:
@@ -604,15 +641,75 @@ class SearchDialog(QDialog):
         self.navigate_to.emit(path)
         self.accept()
 
+    def feed_results(self):
+        self.feed_to_panel.emit(self.results_data)
+        self.accept()
+
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and event.position().y() < 38:
-            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
+        if event.button() == Qt.LeftButton:
+            edge = self._get_edge(event.position().toPoint())
+            if edge:
+                self._resizing = True
+                self._resize_edge = edge
+                event.accept()
+            elif event.position().y() < 38:
+                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
 
     def mouseMoveEvent(self, event):
-        if self._drag_pos and event.buttons() & Qt.LeftButton:
+        pos = event.position().toPoint()
+        if not event.buttons():
+            edge = self._get_edge(pos)
+            self._update_cursor(edge)
+            return
+
+        if self._resizing and self._resize_edge:
+            self._handle_resize(event.globalPosition().toPoint())
+            event.accept()
+        elif self._drag_pos and event.buttons() & Qt.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
 
     def mouseReleaseEvent(self, event):
         self._drag_pos = None
+        self._resizing = False
+        self._resize_edge = None
+
+    def _get_edge(self, pos):
+        w, h = self.width(), self.height()
+        m = self._resize_margin
+        on_left = pos.x() < m
+        on_right = pos.x() > w - m
+        on_top = pos.y() < m
+        on_bottom = pos.y() > h - m
+        
+        if on_left and on_top: return "top-left"
+        if on_right and on_top: return "top-right"
+        if on_left and on_bottom: return "bottom-left"
+        if on_right and on_bottom: return "bottom-right"
+        if on_left: return "left"
+        if on_right: return "right"
+        if on_top: return "top"
+        if on_bottom: return "bottom"
+        return None
+
+    def _update_cursor(self, edge):
+        if edge in ("top", "bottom"): self.setCursor(Qt.SizeVerCursor)
+        elif edge in ("left", "right"): self.setCursor(Qt.SizeHorCursor)
+        elif edge in ("top-left", "bottom-right"): self.setCursor(Qt.SizeBDiagCursor)
+        elif edge in ("top-right", "bottom-left"): self.setCursor(Qt.SizeFDiagCursor)
+        else: self.setCursor(Qt.ArrowCursor)
+
+    def _handle_resize(self, global_pos):
+        rect = self.geometry()
+        edge = self._resize_edge
+        min_w, min_h = self.minimumSize().width(), self.minimumSize().height()
+        if "left" in edge:
+            new_w = rect.right() - global_pos.x()
+            if new_w >= min_w: rect.setLeft(global_pos.x())
+        if "right" in edge: rect.setRight(global_pos.x())
+        if "top" in edge:
+            new_h = rect.bottom() - global_pos.y()
+            if new_h >= min_h: rect.setTop(global_pos.y())
+        if "bottom" in edge: rect.setBottom(global_pos.y())
+        self.setGeometry(rect)

@@ -37,13 +37,31 @@
   - [x] Extract ActionManager (Decouple logic from main window)
   - [x] FilePanel Decomposition (InteractionHandler & ContextMenuBuilder)
   - [x] Cleanup and Import Consolidation
+- [x] Phase 24: UI Polish & Preview Fixes (v1.8.1)
+  - [x] Fix F3 Preview (Text, Image, HEIC, WEBP)
+  - [x] Implement Resizable Frameless Dialogs
+  - [x] Add SizeGrips (Dots) to all major dialogs
+  - [x] Add Cursor feedback for resizing
+- [x] Phase 25: Enterprise Architectural Hardening (v1.9.0)
+  - [x] 25.1 Zavedení robustní testovací infrastruktury (pytest, pytest-qt, mocking)
+  - [x] 25.2 Striktní typování (Type Hinting & Mypy integrace)
+  - [x] 25.3 Thread-Safe Logovací Systém (QueueHandler pro QThread)
+  - [x] 25.4 Event Bus (Kompletní decoupling UI od logiky přes signály)
 
-## Aktuální verze: 1.8.0 (Stable Refactored)
+- [ ] Phase 26: Architecture Integration & Risk Mitigation (v2.0.0)
+  - [x] 26.1 EventBus Integration: Odpojení `FilePanel` od `ActionManager` monolitických volání pomocí custom signálů.
+  - [x] 26.2 Queue & Action Refactor: Centralizace odchytu signálů v `ActionManageru` a zamezení přímým importům dialogů.
+  - [x] 26.3 Unified Logging: Odstranění všech volných `print()` a logování přes centrální sběrnici v klíčových filech.
+  - [x] 26.4 Exception Mitigation: Oprava tichých pádů `except: pass` aspoň na úroveň chyby v logu (archive_vfs, sftp_vfs atd.).
+  - [ ] 26.5 Aktualizace testů a finalizace V2 verze.
+
+## Aktuální verze: 1.9.0 (Enterprise Hardened)
 
 - **Novinky:**
   - Plnohodnotný **Multi-Rename Tool** s podporou regulárních výrazů a šablon.
   - **Flexibilní záložky (Tabs)** pro oba panely s možností zamykání.
   - **Synchronizace složek** s vizuálním náhledem změn a asynchronním provedením.
-  - **Vylepšený prohlížeč (F3)**: Renderování Markdownu a přehrávání videa/audia.
+  - **Vylepšený prohlížeč (F3)**: Renderování Markdownu, přehrávání videa/audia a rozšířená podpora obrázků (**HEIC, WEBP**).
+  - **Resizability**: Všechny dialogy jsou nyní roztahovatelné s vizuálními "grip" tečkami a kurzory.
   - **SSH Command Line**: Možnost spouštět příkazy přímo na vzdáleném serveru v SFTP panelu.
 - **Design:** Catppuccin Mocha s plynulými animacemi a moderními prvky.

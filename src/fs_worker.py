@@ -1,16 +1,27 @@
 import os
 import time
 import math
+import stat
 from PySide6.QtCore import QThread, Signal, QObject
 
+try:
+    import pwd
+    import grp
+except ImportError:
+    pwd = None # type: ignore
+    grp = None # type: ignore
+
 class FileInfo:
-    def __init__(self, name, ext, size, date, is_dir, full_path, size_bytes=0, mtime=0):
+    def __init__(self, name, ext, size, date, is_dir, full_path, size_bytes=0, mtime=0, owner="", group="", permissions=""):
         self.name = name
         self.ext = ext
         self.size = size
         self.date = date
         self.is_dir = is_dir
         self.full_path = full_path
+        self.owner = owner
+        self.group = group
+        self.permissions = permissions
         # Raw values for numeric sorting
         self._size_bytes = size_bytes
         self._mtime = mtime
@@ -57,9 +68,28 @@ class ScanWorker(QObject):
 
                         date_str = time.strftime('%d.%m.%Y %H:%M', time.localtime(mtime))
                         
+                        permissions = stat.filemode(stats.st_mode)
+                        
+                        owner, group = "", ""
+                        if pwd:
+                            try:
+                                owner = pwd.getpwuid(stats.st_uid).pw_name
+                            except KeyError:
+                                owner = str(stats.st_uid)
+                        else:
+                            owner = str(stats.st_uid)
+                            
+                        if grp:
+                            try:
+                                group = grp.getgrgid(stats.st_gid).gr_name
+                            except KeyError:
+                                group = str(stats.st_gid)
+                        else:
+                            group = str(stats.st_gid)
+                        
                         files.append(FileInfo(
                             name, ext, size_str, date_str, is_dir, entry.path,
-                            size_bytes, mtime
+                            size_bytes, mtime, owner, group, permissions
                         ))
 
                         # Emit chunk every 100 items

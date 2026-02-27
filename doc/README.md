@@ -9,7 +9,8 @@ Moderní open-source dvou-panelový správce souborů pro Windows/Linux/Mac, ins
 - **Hromadné přejmenování (Multi-Rename)**: Pokročilý nástroj s maskami `[N]`, `[E]`, `[C]`, `[D]` a podporou regulárních výrazů.
 - **Synchronizace složek**: Vizuální porovnání obsahu dvou adresářů a jejich sjednocení.
 - **Queue Manager**: Všechny operace (kopírování, přejmenování) běží na pozadí a neblokují UI.
-- **Pokročilý Prohlížeč (F3)**: Renderování Markdownu, přehrávání médií (Audio/Video), zvýrazňování syntaxe a hexadecimální režim.
+- **Pokročilý Prohlížeč (F3)**: Renderování Markdownu, přehrávání médií (Audio/Video), zvýrazňování syntaxe, hexadecimální režim a podpora obrázků (včetně **HEIC/WEBP**).
+- **Moderní UI UX**: Všechna dialogová okna jsou resizable (roztahovatelná) s vizuálními indikátory a inteligentními kurzory, přestože zůstávají frameless.
 - **Integrovaná Příkazová Řádka**: Podpora pro lokální subprocess i vzdálené příkazy přes SSH (u SFTP panelů).
 
 ## Klávesové Zkratky

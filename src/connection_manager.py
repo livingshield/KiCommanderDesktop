@@ -79,7 +79,7 @@ class EditConnectionDialog(QDialog):
 
         self.user_edit = QLineEdit()
         self.pass_edit = QLineEdit()
-        self.pass_edit.setEchoMode(QLineEdit.Password)
+        self.pass_edit.setEchoMode(QLineEdit.EchoMode.Password)
 
         self.domain_edit = QLineEdit()
         self.domain_edit.setPlaceholderText("Optional domain (SMB only)")
@@ -95,7 +95,7 @@ class EditConnectionDialog(QDialog):
 
         layout.addLayout(form)
 
-        btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(self._validate_and_accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
@@ -207,12 +207,12 @@ class ConnectionManagerDialog(QDialog):
             if c.get("type") == "SMB" and c.get("share"):
                 label += f"\\{c['share']}"
             item = QListWidgetItem(label)
-            item.setData(Qt.UserRole, c)
+            item.setData(Qt.ItemDataRole.UserRole, c)
             self.list_widget.addItem(item)
 
     def _current_conn(self) -> dict | None:
         item = self.list_widget.currentItem()
-        return item.data(Qt.UserRole) if item else None
+        return item.data(Qt.ItemDataRole.UserRole) if item else None
 
     def _add_connection(self):
         dlg = EditConnectionDialog(self)

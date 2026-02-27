@@ -1,13 +1,10 @@
 import os
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                             QPlainTextEdit, QTabWidget, QWidget, QScrollArea,
-                             QPushButton, QTextBrowser)
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PySide6.QtMultimediaWidgets import QVideoWidget
+                             QWidget, QPushButton, QSizeGrip)
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QFont
 import qtawesome as qta
-from syntax_highlighter import CodeHighlighter
+from quick_view_widget import QuickViewWidget
 
 class PreviewDialog(QDialog):
     def __init__(self, file_path, parent=None):
@@ -16,7 +13,11 @@ class PreviewDialog(QDialog):
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.Dialog)
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setMinimumSize(700, 500)
+        self.setMouseTracking(True)
         self._drag_pos = None
+        self._resize_margin = 8
+        self._resizing = False
+        self._resize_edge = None # Can be 'left', 'right', 'top', 'bottom', 'top-left', etc.
         self.setup_ui()
 
     def setup_ui(self):
@@ -85,121 +86,111 @@ class PreviewDialog(QDialog):
             #TitleCloseBtn:hover { background-color: #f38ba8; }
             #DialogContent { background-color: #1e1e2e; border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; }
             QLabel { color: #cdd6f4; font-size: 10pt; }
-            QPlainTextEdit {
-                background-color: #181825; color: #cdd6f4;
-                border: 1px solid #313244; border-radius: 4px; padding: 4px;
-                font-family: 'Consolas', 'Courier New', monospace; font-size: 10pt;
-            }
             QScrollArea { background-color: #181825; border: none; }
         """)
 
-        ext = os.path.splitext(self.file_path)[1].lower()
+        # Využití nového unifikovaného komponentu pro prohlížení souborů
+        self.viewer = QuickViewWidget(self)
+        layout.addWidget(self.viewer)
+        self.viewer.load_file(self.file_path)
 
-        if ext in [".jpg", ".jpeg", ".png", ".bmp", ".gif", ".ico", ".svg"]:
-            self.show_image(layout)
-        elif ext == ".md":
-            self.show_markdown(layout)
-        elif ext in [".txt", ".py", ".json", ".xml", ".html", ".css", ".js",
-                     ".csv", ".log", ".ini", ".cfg", ".yml", ".yaml", ".toml",
-                     ".bat", ".cmd", ".sh", ".ps1", ".c", ".cpp", ".h", ".java",
-                     ".rs", ".go", ".ts", ".tsx", ".jsx", ".vue", ".qss"]:
-            self.show_text(layout)
-        elif ext in [".mp3", ".wav", ".m4a", ".flac", ".ogg"]:
-            self.show_media(layout, video=False)
-        elif ext in [".mp4", ".mkv", ".avi", ".mov"]:
-            self.show_media(layout, video=True)
-        else:
-            self.show_hex(layout)
+        # Autoplay if media (chceme zachovat chování pro samostatné preview okno)
+        if hasattr(self.viewer, 'player') and self.viewer.player:
+             self.viewer.player.play()
 
-    def show_image(self, layout):
-        scroll = QScrollArea()
-        label = QLabel()
-        pixmap = QPixmap(self.file_path)
-        if pixmap.width() > 680:
-            pixmap = pixmap.scaledToWidth(680, Qt.SmoothTransformation)
-        label.setPixmap(pixmap)
-        label.setAlignment(Qt.AlignCenter)
-        scroll.setWidget(label)
-        scroll.setWidgetResizable(True)
-        layout.addWidget(scroll)
-
-        layout.addWidget(editor)
-
-    def show_markdown(self, layout):
-        browser = QTextBrowser()
-        browser.setStyleSheet("background-color: #181825; color: #cdd6f4; border: 1px solid #313244;")
-        try:
-            with open(self.file_path, "r", encoding="utf-8", errors="replace") as f:
-                content = f.read()
-            browser.setMarkdown(content)
-        except Exception as e:
-            browser.setPlainText(f"Error rendering markdown: {e}")
-        layout.addWidget(browser)
-
-    def show_media(self, layout, video=True):
-        container = QWidget()
-        vbox = QVBoxLayout(container)
+        # Footer with Size Grip (the "dots")
+        footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(0, 0, 0, 0)
+        footer_layout.addStretch()
         
-        self.player = QMediaPlayer()
-        self.audio_output = QAudioOutput()
-        self.player.setAudioOutput(self.audio_output)
+        # We'll use a QSizeGrip which already has the dots in most styles,
+        # but we'll ensure it's positioned correctly.
+        grip = QSizeGrip(self)
+        grip.setFixedSize(16, 16)
+        footer_layout.addWidget(grip, 0, Qt.AlignBottom | Qt.AlignRight)
         
-        if video:
-            video_widget = QVideoWidget()
-            video_widget.setMinimumHeight(300)
-            vbox.addWidget(video_widget)
-            self.player.setVideoOutput(video_widget)
-        else:
-            icon = QLabel()
-            icon.setPixmap(qta.icon("fa5s.music", color="#89b4fa").pixmap(64, 64))
-            icon.setAlignment(Qt.AlignCenter)
-            vbox.addWidget(icon)
+        main_layout.addLayout(footer_layout)
 
-        controls = QHBoxLayout()
-        play_btn = QPushButton("Play")
-        play_btn.clicked.connect(self.player.play)
-        pause_btn = QPushButton("Pause")
-        pause_btn.clicked.connect(self.player.pause)
-        
-        controls.addWidget(play_btn)
-        controls.addWidget(pause_btn)
-        vbox.addLayout(controls)
-        
-        from PySide6.QtCore import QUrl
-        self.player.setSource(QUrl.fromLocalFile(self.file_path))
-        layout.addWidget(container)
-        self.player.play()
 
-    def show_hex(self, layout):
-        editor = QPlainTextEdit()
-        editor.setReadOnly(True)
-        editor.setFont(QFont("Consolas", 10))
-        try:
-            with open(self.file_path, "rb") as f:
-                data = f.read(4096)
-            lines = []
-            for i in range(0, len(data), 16):
-                chunk = data[i:i+16]
-                hex_part = " ".join(f"{b:02X}" for b in chunk)
-                ascii_part = "".join(chr(b) if 32 <= b < 127 else "." for b in chunk)
-                lines.append(f"{i:08X}  {hex_part:<48}  {ascii_part}")
-            editor.setPlainText("\n".join(lines))
-        except Exception as e:
-            editor.setPlainText(f"Error reading file: {e}")
-        layout.addWidget(editor)
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton and event.position().y() < 38:
-            self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
-            event.accept()
+        if event.button() == Qt.LeftButton:
+            edge = self._get_edge(event.position().toPoint())
+            if edge:
+                self._resizing = True
+                self._resize_edge = edge
+                event.accept()
+            elif event.position().y() < 38:
+                self._drag_pos = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+                event.accept()
 
     def mouseMoveEvent(self, event):
-        if self._drag_pos and event.buttons() & Qt.LeftButton:
+        pos = event.position().toPoint()
+        
+        if not event.buttons():
+            # Update cursor based on edge
+            edge = self._get_edge(pos)
+            self._update_cursor(edge)
+            return
+
+        if self._resizing and self._resize_edge:
+            self._handle_resize(event.globalPosition().toPoint())
+            event.accept()
+        elif self._drag_pos and event.buttons() & Qt.LeftButton:
             self.move(event.globalPosition().toPoint() - self._drag_pos)
             event.accept()
 
     def mouseReleaseEvent(self, event):
         self._drag_pos = None
+        self._resizing = False
+        self._resize_edge = None
+
+    def _get_edge(self, pos):
+        """Returns the edge/corner at the given local position."""
+        w, h = self.width(), self.height()
+        m = self._resize_margin
+        
+        on_left = pos.x() < m
+        on_right = pos.x() > w - m
+        on_top = pos.y() < m
+        on_bottom = pos.y() > h - m
+        
+        if on_left and on_top: return "top-left"
+        if on_right and on_top: return "top-right"
+        if on_left and on_bottom: return "bottom-left"
+        if on_right and on_bottom: return "bottom-right"
+        if on_left: return "left"
+        if on_right: return "right"
+        if on_top: return "top"
+        if on_bottom: return "bottom"
+        return None
+
+    def _update_cursor(self, edge):
+        if edge in ("top", "bottom"): self.setCursor(Qt.SizeVerCursor)
+        elif edge in ("left", "right"): self.setCursor(Qt.SizeHorCursor)
+        elif edge in ("top-left", "bottom-right"): self.setCursor(Qt.SizeBDiagCursor)
+        elif edge in ("top-right", "bottom-left"): self.setCursor(Qt.SizeFDiagCursor)
+        else: self.setCursor(Qt.ArrowCursor)
+
+    def _handle_resize(self, global_pos):
+        rect = self.geometry()
+        edge = self._resize_edge
+        min_w, min_h = self.minimumSize().width(), self.minimumSize().height()
+        
+        if "left" in edge:
+            new_w = rect.right() - global_pos.x()
+            if new_w >= min_w:
+                rect.setLeft(global_pos.x())
+        if "right" in edge:
+            rect.setRight(global_pos.x())
+        if "top" in edge:
+            new_h = rect.bottom() - global_pos.y()
+            if new_h >= min_h:
+                rect.setTop(global_pos.y())
+        if "bottom" in edge:
+            rect.setBottom(global_pos.y())
+            
+        self.setGeometry(rect)
 
     @staticmethod
     def _format_size(size):

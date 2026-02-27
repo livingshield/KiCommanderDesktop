@@ -1,0 +1,94 @@
+============================= test session starts =============================
+platform win32 -- Python 3.11.9, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop
+collected 7 items
+
+tests\test_queue_manager.py EEEEEEE                                      [100%]
+
+=================================== ERRORS ====================================
+______________________ ERROR at setup of test_singleton _______________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 26
+  def test_singleton(queue_manager):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+_____________________ ERROR at setup of test_add_to_queue _____________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 30
+  def test_add_to_queue(queue_manager, mocker):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+_____________________ ERROR at setup of test_remove_item ______________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 46
+  def test_remove_item(queue_manager):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+_____________________ ERROR at setup of test_pause_queue ______________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 56
+  def test_pause_queue(queue_manager, mocker):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+_____________________ ERROR at setup of test_on_progress ______________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 69
+  def test_on_progress(queue_manager):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+_____________________ ERROR at setup of test_on_finished ______________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 78
+  def test_on_finished(queue_manager, mocker):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+__________________ ERROR at setup of test_on_finished_error ___________________
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 95
+  def test_on_finished_error(queue_manager, mocker):
+file C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py, line 12
+  @pytest.fixture(autouse=True)
+  def mock_qthread(mocker):
+E       fixture 'mocker' not found
+>       available fixtures: cache, capfd, capfdbinary, caplog, capsys, capsysbinary, capteesys, doctest_namespace, mock_qthread, monkeypatch, pytestconfig, queue_manager, record_property, record_testsuite_property, record_xml_attribute, recwarn, subtests, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+C:\Users\lordk\.gemini\antigravity\scratch\KiCommanderDesktop\tests\test_queue_manager.py:12
+=========================== short test summary info ===========================
+ERROR tests/test_queue_manager.py::test_singleton
+ERROR tests/test_queue_manager.py::test_add_to_queue
+ERROR tests/test_queue_manager.py::test_remove_item
+ERROR tests/test_queue_manager.py::test_pause_queue
+ERROR tests/test_queue_manager.py::test_on_progress
+ERROR tests/test_queue_manager.py::test_on_finished
+ERROR tests/test_queue_manager.py::test_on_finished_error
+============================== 7 errors in 0.16s ==============================

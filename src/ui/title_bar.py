@@ -66,6 +66,22 @@ class CustomTitleBar(QWidget):
         
         self.drag_pos = None
 
+    def update_icon(self, icon_name):
+        """Dynamically update the title bar icon."""
+        icon_path_assets = os.path.join(ASSETS_DIR, icon_name)
+        icon_path_icons = os.path.join(ASSETS_DIR, "icons", icon_name)
+        
+        icon_path = None
+        if os.path.exists(icon_path_icons):
+            icon_path = icon_path_icons
+        elif os.path.exists(icon_path_assets):
+            icon_path = icon_path_assets
+            
+        if icon_path:
+            self.icon_label.setPixmap(QPixmap(icon_path).scaled(22, 22, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+        else:
+            self.icon_label.setPixmap(qta.icon("fa5s.rocket", color="#89b4fa").pixmap(22, 22))
+
     def toggle_maximize(self):
         if self.parent.isMaximized():
             self.parent.showNormal()
