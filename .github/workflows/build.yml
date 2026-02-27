@@ -34,8 +34,20 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
 
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xfixes0 libxcb-xinerama0 libxkbcommon-x11-0 libxcb-cursor0 libx11-xcb1 libxss1 libasound2 libglib2.0-0 libnss3 
+
       - name: Run tests
-        run: python -m pytest tests/ -v --tb=short
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            xvfb-run python -m pytest tests/ -v --tb=short
+          else
+            python -m pytest tests/ -v --tb=short
+          fi
 
   build:
     name: Build on ${{ matrix.os }}
@@ -59,6 +71,12 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
+
+      - name: Install Linux GUI dependencies for build
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-cursor0
 
       - name: Build executable
         run: pyinstaller KiCommander.spec --noconfirm
